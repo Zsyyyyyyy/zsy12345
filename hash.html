@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>哈希值计算</title>
+    <style>
+        :root {
+            --bg: #0f172a; --card-bg: #1e293b; --card-border: #334155;
+            --text: #e2e8f0; --text-secondary: #94a3b8;
+            --accent: #3b82f6; --accent-hover: #2563eb;
+            --input-bg: #0f172a; --input-border: #475569;
+            --success: #10b981; --shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%; max-width: 620px;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 20px; padding: 36px 32px; box-shadow: var(--shadow);
+        }
+
+        .header { text-align: center; margin-bottom: 28px; }
+        .header h1 {
+            font-size: 26px; font-weight: 700;
+            background: linear-gradient(135deg, #c084fc, #a855f7);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; margin-bottom: 6px;
+        }
+        .header .subtitle { font-size: 13px; color: var(--text-secondary); letter-spacing: 1px; }
+        .back-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 12px; margin-bottom: 12px; transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--text); }
+
+        textarea {
+            width: 100%; height: 120px; background: var(--input-bg);
+            border: 2px solid var(--input-border); border-radius: 14px;
+            padding: 16px; color: var(--text); font-size: 14px; resize: vertical;
+            font-family: "SF Mono","JetBrains Mono","Menlo",monospace;
+            outline: none; transition: border-color 0.2s; margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        textarea:focus { border-color: var(--accent); }
+        textarea::placeholder { color: var(--text-secondary); opacity: 0.4; }
+
+        .hash-list { display: flex; flex-direction: column; gap: 2px; }
+
+        .hash-item {
+            display: flex; align-items: center; gap: 14px;
+            background: var(--input-bg); border: 1px solid var(--input-border);
+            border-radius: 12px; padding: 14px 18px;
+            transition: border-color 0.2s;
+        }
+
+        .hash-label {
+            font-size: 13px; font-weight: 700; color: var(--text-secondary);
+            min-width: 62px; flex-shrink: 0; text-align: center;
+            padding: 4px 10px; border-radius: 6px;
+            background: rgba(255,255,255,0.04);
+        }
+
+        .hash-value {
+            flex: 1; font-family: "SF Mono","JetBrains Mono","Menlo",monospace;
+            font-size: 14px; color: var(--text); word-break: break-all;
+            min-height: 20px; line-height: 1.5;
+        }
+        .hash-value.empty { color: var(--text-secondary); font-size: 13px; font-style: italic; }
+
+        .hash-copy {
+            background: none; border: 1px solid var(--input-border); color: var(--text-secondary);
+            border-radius: 6px; padding: 4px 12px; font-size: 11px; cursor: pointer;
+            font-family: inherit; transition: all 0.2s; flex-shrink: 0;
+        }
+        .hash-copy:hover { border-color: var(--accent); color: var(--accent); }
+        .hash-copy.copied { border-color: var(--success); color: var(--success); }
+
+        .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .char-count { font-size: 12px; color: var(--text-secondary); }
+        .mode-toggle { display: flex; gap: 4px; }
+        .mode-btn {
+            background: rgba(255,255,255,0.04); border: 1px solid var(--input-border);
+            color: var(--text-secondary); padding: 6px 14px; border-radius: 8px;
+            font-size: 12px; cursor: pointer; font-family: inherit; transition: all 0.2s;
+        }
+        .mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(59,130,246,0.1); }
+        .mode-btn:hover { border-color: var(--text-secondary); }
+
+        @media (max-width: 520px) {
+            .container { padding: 24px 18px; border-radius: 16px; }
+            .hash-item { padding: 12px 14px; gap: 10px; }
+            .hash-label { min-width: 52px; font-size: 12px; padding: 3px 8px; }
+            .hash-value { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a class="back-link" href="tools.html">← 返回工具箱</a>
+        <div class="header">
+            <h1># 哈希值计算</h1>
+            <div class="subtitle">MD5 · SHA1 · SHA256 · SHA512</div>
+        </div>
+
+        <div class="info-row">
+            <span class="char-count" id="charCount">0 字符</span>
+            <div class="mode-toggle">
+                <button class="mode-btn active" data-mode="text">文本</button>
+                <button class="mode-btn" data-mode="hex">十六进制</button>
+            </div>
+        </div>
+        <textarea id="hashInput" placeholder="输入文本内容..."></textarea>
+
+        <div class="hash-list">
+            <div class="hash-item">
+                <span class="hash-label">MD5</span>
+                <span class="hash-value empty" id="md5Val">等待输入...</span>
+                <button class="hash-copy" data-target="md5Val">复制</button>
+            </div>
+            <div class="hash-item">
+                <span class="hash-label">SHA1</span>
+                <span class="hash-value empty" id="sha1Val">等待输入...</span>
+                <button class="hash-copy" data-target="sha1Val">复制</button>
+            </div>
+            <div class="hash-item">
+                <span class="hash-label">SHA256</span>
+                <span class="hash-value empty" id="sha256Val">等待输入...</span>
+                <button class="hash-copy" data-target="sha256Val">复制</button>
+            </div>
+            <div class="hash-item">
+                <span class="hash-label">SHA512</span>
+                <span class="hash-value empty" id="sha512Val">等待输入...</span>
+                <button class="hash-copy" data-target="sha512Val">复制</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+(function() {
+    var $ = function(id) { return document.getElementById(id); };
+    var input = $('hashInput'), charCount = $('charCount');
+    var inputMode = 'text'; // 'text' or 'hex'
+
+    // --- MD5 (pure JS, public domain) ---
+    function md5(str) {
+        function cmn(q,a,b,x,s,t){a=add32(add32(a,q),add32(x,t));return add32((a<<s)|(a>>>(32-s)),b);}
+        function ff(a,b,c,d,x,s,t){return cmn((b&c)|((~b)&d),a,b,x,s,t);}
+        function gg(a,b,c,d,x,s,t){return cmn((b&d)|(c&(~d)),a,b,x,s,t);}
+        function hh(a,b,c,d,x,s,t){return cmn(b^c^d,a,b,x,s,t);}
+        function ii(a,b,c,d,x,s,t){return cmn(c^(b|(~d)),a,b,x,s,t);}
+        function md5cycle(x,k){
+            var a=x[0],b=x[1],c=x[2],d=x[3];
+            a=ff(a,b,c,d,k[0],7,-680876936);d=ff(d,a,b,c,k[1],12,-389564586);c=ff(c,d,a,b,k[2],17,606105819);b=ff(b,c,d,a,k[3],22,-1044525330);
+            a=ff(a,b,c,d,k[4],7,-176418897);d=ff(d,a,b,c,k[5],12,1200080426);c=ff(c,d,a,b,k[6],17,-1473231341);b=ff(b,c,d,a,k[7],22,-45705983);
+            a=ff(a,b,c,d,k[8],7,1770035416);d=ff(d,a,b,c,k[9],12,-1958414417);c=ff(c,d,a,b,k[10],17,-42063);b=ff(b,c,d,a,k[11],22,-1990404162);
+            a=ff(a,b,c,d,k[12],7,1804603682);d=ff(d,a,b,c,k[13],12,-40341101);c=ff(c,d,a,b,k[14],17,-1502002290);b=ff(b,c,d,a,k[15],22,1236535329);
+            a=gg(a,b,c,d,k[1],5,-165796510);d=gg(d,a,b,c,k[6],9,-1069501632);c=gg(c,d,a,b,k[11],14,643717713);b=gg(b,c,d,a,k[0],20,-373897302);
+            a=gg(a,b,c,d,k[5],5,-701558691);d=gg(d,a,b,c,k[10],9,38016083);c=gg(c,d,a,b,k[15],14,-660478335);b=gg(b,c,d,a,k[4],20,-405537848);
+            a=gg(a,b,c,d,k[9],5,568446438);d=gg(d,a,b,c,k[14],9,-1019803690);c=gg(c,d,a,b,k[3],14,-187363961);b=gg(b,c,d,a,k[8],20,1163531501);
+            a=gg(a,b,c,d,k[13],5,-1444681467);d=gg(d,a,b,c,k[2],9,-51403784);c=gg(c,d,a,b,k[7],14,1735328473);b=gg(b,c,d,a,k[12],20,-1926607734);
+            a=hh(a,b,c,d,k[5],4,-378558);d=hh(d,a,b,c,k[8],11,-2022574463);c=hh(c,d,a,b,k[11],16,1839030562);b=hh(b,c,d,a,k[14],23,-35309556);
+            a=hh(a,b,c,d,k[1],4,-1530992060);d=hh(d,a,b,c,k[4],11,1272893353);c=hh(c,d,a,b,k[7],16,-155497632);b=hh(b,c,d,a,k[10],23,-1094730640);
+            a=hh(a,b,c,d,k[13],4,681279174);d=hh(d,a,b,c,k[0],11,-358537222);c=hh(c,d,a,b,k[3],16,-722521979);b=hh(b,c,d,a,k[6],23,76029189);
+            a=hh(a,b,c,d,k[9],4,-640364487);d=hh(d,a,b,c,k[12],11,-421815835);c=hh(c,d,a,b,k[15],16,530742520);b=hh(b,c,d,a,k[2],23,-995338651);
+            a=ii(a,b,c,d,k[0],6,-198630844);d=ii(d,a,b,c,k[7],10,1126891415);c=ii(c,d,a,b,k[14],15,-1416354905);b=ii(b,c,d,a,k[5],21,-57434055);
+            a=ii(a,b,c,d,k[12],6,1700485571);d=ii(d,a,b,c,k[3],10,-1894986606);c=ii(c,d,a,b,k[10],15,-1051523);b=ii(b,c,d,a,k[1],21,-2054922799);
+            a=ii(a,b,c,d,k[8],6,1873313359);d=ii(d,a,b,c,k[15],10,-30611744);c=ii(c,d,a,b,k[6],15,-1560198380);b=ii(b,c,d,a,k[13],21,1309151649);
+            a=ii(a,b,c,d,k[4],6,-145523070);d=ii(d,a,b,c,k[11],10,-1120210379);c=ii(c,d,a,b,k[2],15,718787259);b=ii(b,c,d,a,k[9],21,-343485551);
+            x[0]=add32(a,x[0]);x[1]=add32(b,x[1]);x[2]=add32(c,x[2]);x[3]=add32(d,x[3]);
+        }
+        function add32(a,b){var lsw=(a&0xFFFF)+(b&0xFFFF),msw=(a>>16)+(b>>16)+(lsw>>16);return(msw<<16)|(lsw&0xFFFF);}
+        function md51(s){
+            var n=s.length,state=[1732584193,-271733879,-1732584194,271733878],i,blk,tail=[];
+            for(i=64;i<=n;i+=64) md5cycle(state,md5blk(s.substring(i-64,i)));
+            s=s.substring(i-64);
+            for(i=0;i<s.length;i++) tail[i>>2]|=s.charCodeAt(i)<<((i%4)<<3);
+            tail[i>>2]|=0x80<<((i%4)<<3);
+            if(i>55){md5cycle(state,tail);for(i=0;i<16;i++) tail[i]=0;}
+            tail[14]=n*8;md5cycle(state,tail);
+            return state;
+        }
+        function md5blk(s){var b=[],i;for(i=0;i<64;i+=4)b[i>>2]=s.charCodeAt(i)+(s.charCodeAt(i+1)<<8)+(s.charCodeAt(i+2)<<16)+(s.charCodeAt(i+3)<<24);return b;}
+        var hx='0123456789abcdef',val=md51(str),out='';
+        for(var i=0;i<4;i++){out+=hx.charAt((val[i]>>4)&0x0F)+hx.charAt(val[i]&0x0F)+hx.charAt((val[i]>>12)&0x0F)+hx.charAt((val[i]>>8)&0x0F)+hx.charAt((val[i]>>20)&0x0F)+hx.charAt((val[i]>>16)&0x0F)+hx.charAt((val[i]>>28)&0x0F)+hx.charAt((val[i]>>24)&0x0F);}
+        return out;
+    }
+
+    // --- SHA via Web Crypto ---
+    function buf2hex(buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function(b) { return b.toString(16).padStart(2,'0'); }).join('');
+    }
+
+    async function sha(alg, data) {
+        var hash = await crypto.subtle.digest(alg, data);
+        return buf2hex(hash);
+    }
+
+    // --- Update all hashes ---
+    var debounceTimer;
+    function updateHashes() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(doUpdate, 100);
+    }
+
+    async function doUpdate() {
+        var raw = input.value;
+        charCount.textContent = raw.length + ' 字符';
+
+        if (!raw) {
+            ['md5','sha1','sha256','sha512'].forEach(function(t) {
+                var el = $(t+'Val'); el.textContent = '等待输入...'; el.className = 'hash-value empty';
+            });
+            return;
+        }
+
+        var data;
+        if (inputMode === 'hex') {
+            // Parse hex string to bytes
+            var hex = raw.replace(/\s/g,'');
+            if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) {
+                ['md5','sha1','sha256','sha512'].forEach(function(t) {
+                    var el = $(t+'Val'); el.textContent = '无效的十六进制'; el.className = 'hash-value empty';
+                });
+                return;
+            }
+            data = new Uint8Array(hex.length/2);
+            for (var i=0;i<data.length;i++) data[i]=parseInt(hex.substr(i*2,2),16);
+        } else {
+            data = new TextEncoder().encode(raw);
+        }
+
+        // MD5 (synchronous, on raw text)
+        var textForMd5 = inputMode === 'hex' ? raw.replace(/\s/g,'') : raw;
+        $('md5Val').textContent = inputMode === 'hex' ? md5FromHex(raw.replace(/\s/g,'')) : md5(textForMd5);
+        $('md5Val').className = 'hash-value';
+
+        // SHA via Web Crypto
+        try {
+            $('sha1Val').textContent = await sha('SHA-1', data); $('sha1Val').className = 'hash-value';
+        } catch(e) { $('sha1Val').textContent = '计算失败'; $('sha1Val').className = 'hash-value empty'; }
+        try {
+            $('sha256Val').textContent = await sha('SHA-256', data); $('sha256Val').className = 'hash-value';
+        } catch(e) { $('sha256Val').textContent = '计算失败'; $('sha256Val').className = 'hash-value empty'; }
+        try {
+            $('sha512Val').textContent = await sha('SHA-512', data); $('sha512Val').className = 'hash-value';
+        } catch(e) { $('sha512Val').textContent = '计算失败'; $('sha512Val').className = 'hash-value empty'; }
+    }
+
+    // MD5 of hex bytes (treat hex string as raw bytes, hash the bytes)
+    function md5FromHex(hex) {
+        var bytes = '';
+        for (var i = 0; i < hex.length; i += 2) {
+            bytes += String.fromCharCode(parseInt(hex.substr(i,2),16));
+        }
+        return md5(bytes);
+    }
+
+    input.addEventListener('input', updateHashes);
+
+    // --- Mode toggle ---
+    document.querySelectorAll('.mode-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.mode-btn').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            inputMode = btn.dataset.mode;
+            updateHashes();
+        });
+    });
+
+    // --- Copy buttons ---
+    document.querySelectorAll('.hash-copy').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var targetId = btn.dataset.target;
+            var text = $(targetId).textContent;
+            if (!text || text.indexOf('等待')>=0 || text.indexOf('无效')>=0 || text.indexOf('失败')>=0) return;
+            navigator.clipboard.writeText(text).then(function() {
+                btn.textContent = '已复制'; btn.classList.add('copied');
+                setTimeout(function(){ btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+            });
+        });
+    });
+})();
+</script>
+</body>
+</html>

@@ -4,89 +4,200 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZSY12345</title>
-
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: "Microsoft YaHei", Arial, sans-serif;
         }
 
         body {
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: #000;
+            padding: 20px;
+            font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Code", "Consolas", "Courier New", monospace;
         }
 
-        .card {
-            width: 380px;
-            padding: 40px;
-            background: rgba(255,255,255,0.95);
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        .terminal {
+            width: 520px;
+            max-width: 100%;
+            background: #0d0d0d;
+            border-radius: 10px;
+            border: 1px solid #262626;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
         }
 
-        h1 {
-            font-size: 36px;
-            color: #333;
-            margin-bottom: 20px;
-            letter-spacing: 2px;
+        .titlebar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 16px;
+            background: #151515;
+            border-bottom: 1px solid #262626;
         }
 
-        p {
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot.red { background: #ff5f56; }
+        .dot.yellow { background: #ffbd2e; }
+        .dot.green { background: #27c93f; }
+
+        .title {
+            margin-left: 12px;
+            font-size: 13px;
             color: #666;
-            font-size: 18px;
-            margin-bottom: 30px;
         }
 
-        .btn {
-            display: block;
-            margin: 15px auto;
-            width: 220px;
-            padding: 14px;
+        .content {
+            padding: 28px 32px 36px;
+        }
+
+        .prompt-line {
+            margin-bottom: 24px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .user { color: #7ee787; }
+        .host { color: #79c0ff; }
+        .path { color: #d2a8ff; }
+        .comment { color: #8b949e; }
+        .prompt { color: #f0f6fc; }
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #7ee787;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .cmd-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cmd {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 6px;
             text-decoration: none;
-            color: white;
-            background: linear-gradient(135deg,#4facfe,#00f2fe);
-            border-radius: 30px;
-            font-size: 18px;
-            transition: all .3s;
+            color: #c9d1d9;
+            font-size: 14px;
+            transition: all 0.2s ease;
         }
 
-        .btn:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,.2);
+        .cmd:hover {
+            background: #1a1a1a;
+            border-color: #444;
+            transform: translateX(4px);
         }
 
+        .cmd .num {
+            color: #58a6ff;
+            min-width: 24px;
+        }
+
+        .cmd .arrow {
+            color: #8b949e;
+            margin-left: auto;
+        }
+
+        .cmd.ext .num { color: #d2a8ff; }
+        .cmd.game .num { color: #ff7b72; }
+        .cmd.fun .num { color: #ffa657; }
+
+        .footer {
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid #222;
+            font-size: 12px;
+            color: #484f58;
+        }
+
+        @media (max-width: 480px) {
+            .content { padding: 22px 20px 28px; }
+            .cmd { font-size: 13px; padding: 10px 12px; }
+        }
     </style>
 </head>
-
-
 <body>
 
-<div class="card">
+<div class="terminal">
+    <div class="titlebar">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+        <span class="title">zsy12345 — zsh</span>
+    </div>
 
-    <h1>ZSY12345</h1>
+    <div class="content">
+        <div class="prompt-line">
+            <span class="user">zsy</span><span class="prompt">@</span><span class="host">macbook</span><span class="prompt">:</span><span class="path">~/tools</span><span class="prompt">$</span> <span class="comment">ls -la</span><span class="cursor"></span>
+        </div>
 
-    <!-- <p>请选择服务</p> -->
+        <div class="cmd-list">
+            <a class="cmd ext" href="https://www.json.cn/?fullscreen" target="_blank" rel="noopener">
+                <span class="num">01</span>
+                <span>JSON 格式化</span>
+                <span class="comment" style="margin-left: auto; margin-right: 8px;">外链</span>
+                <span class="arrow">&#8599;</span>
+            </a>
 
-    <a class="btn" href="/currency-converter.html">
-        汇率转换
-    </a>
+            <a class="cmd" href="timestamp.html">
+                <span class="num">02</span>
+                <span>时间戳转换</span>
+                <span class="arrow">&rarr;</span>
+            </a>
 
-    <a class="btn" href="/2.html">
-        俄罗斯方块
-    </a>
+            <a class="cmd" href="hash.html">
+                <span class="num">03</span>
+                <span>哈希值计算</span>
+                <span class="arrow">&rarr;</span>
+            </a>
 
-    <a class="btn" href="/3.html">
-        占卜
-    </a>
+            <a class="cmd" href="currency-converter.html">
+                <span class="num">04</span>
+                <span>汇率转换</span>
+                <span class="arrow">&rarr;</span>
+            </a>
 
+            <a class="cmd game" href="tetris.html">
+                <span class="num">05</span>
+                <span>俄罗斯方块</span>
+                <span class="arrow">&rarr;</span>
+            </a>
+
+            <a class="cmd fun" href="fortune.html">
+                <span class="num">06</span>
+                <span>灵签占卜</span>
+                <span class="arrow">&rarr;</span>
+            </a>
+        </div>
+
+        <div class="footer">
+            6 entries · press a command to execute
+        </div>
+    </div>
 </div>
-
 
 </body>
 </html>

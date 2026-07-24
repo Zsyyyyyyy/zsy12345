@@ -87,6 +87,14 @@
     min-height: 100vh;
   }
 
+  .back-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: var(--text-secondary); text-decoration: none;
+    font-size: 12px; margin-bottom: 12px; transition: color 0.2s;
+    align-self: flex-start;
+  }
+  .back-link:hover { color: var(--text); }
+
   /* --- Header --- */
   .header {
     text-align: center; padding: 40px 0 24px;
@@ -386,6 +394,7 @@
     </div>
 
 <div class="app">
+  <a class="back-link" href="index.html">← cd ..</a>
   <div class="header">
     <h1>灵 签 占 卜</h1>
     <p class="subtitle">心诚则灵 · 随缘而安</p>

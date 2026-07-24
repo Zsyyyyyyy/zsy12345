@@ -61,7 +61,7 @@
         }
 
         .prompt-line {
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             font-size: 14px;
             line-height: 1.6;
         }
@@ -70,20 +70,34 @@
         .host { color: #79c0ff; }
         .path { color: #d2a8ff; }
         .comment { color: #8b949e; }
+        .error { color: #ff7b72; }
         .prompt { color: #f0f6fc; }
-        .cursor {
-            display: inline-block;
-            width: 8px;
-            height: 16px;
-            background: #7ee787;
-            animation: blink 1s step-end infinite;
-            vertical-align: middle;
-            margin-left: 4px;
+
+        .cmd-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #c9d1d9;
+            font-family: inherit;
+            font-size: 14px;
+            caret-color: #7ee787;
+            width: 60px;
+        }
+        .cmd-input::placeholder {
+            color: #484f58;
         }
 
         @keyframes blink {
             50% { opacity: 0; }
         }
+
+        .output-line {
+            font-size: 14px;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .output-line.show { display: block; }
 
         .cmd-list {
             display: flex;
@@ -114,6 +128,13 @@
         .cmd .num {
             color: #58a6ff;
             min-width: 24px;
+        }
+
+        .cmd .icon {
+            width: 24px;
+            text-align: center;
+            font-size: 13px;
+            opacity: 0.6;
         }
 
         .cmd .arrow {
@@ -151,12 +172,15 @@
 
     <div class="content">
         <div class="prompt-line">
-            <span class="user">zsy</span><span class="prompt">@</span><span class="host">macbook</span><span class="prompt">:</span><span class="path">~/tools</span><span class="prompt">$</span> <span class="comment">ls -la</span><span class="cursor"></span>
+            <span class="user">zsy</span><span class="prompt">@</span><span class="host">macbook</span><span class="prompt">:</span><span class="path">~/tools</span><span class="prompt">$</span> <input class="cmd-input" id="cmdInput" type="text" placeholder="输入 1-6..." autofocus>
         </div>
+
+        <div class="output-line" id="output"></div>
 
         <div class="cmd-list">
             <a class="cmd ext" href="https://www.json.cn/?fullscreen" target="_blank" rel="noopener">
                 <span class="num">01</span>
+                <span class="icon">{ }</span>
                 <span>JSON 格式化</span>
                 <span class="comment" style="margin-left: auto; margin-right: 8px;">外链</span>
                 <span class="arrow">&#8599;</span>
@@ -164,40 +188,89 @@
 
             <a class="cmd" href="timestamp.html">
                 <span class="num">02</span>
+                <span class="icon">&#9200;</span>
                 <span>时间戳转换</span>
                 <span class="arrow">&rarr;</span>
             </a>
 
             <a class="cmd" href="hash.html">
                 <span class="num">03</span>
+                <span class="icon">#</span>
                 <span>哈希值计算</span>
                 <span class="arrow">&rarr;</span>
             </a>
 
             <a class="cmd" href="currency-converter.html">
                 <span class="num">04</span>
+                <span class="icon">&yen;</span>
                 <span>汇率转换</span>
                 <span class="arrow">&rarr;</span>
             </a>
 
             <a class="cmd game" href="tetris.html">
                 <span class="num">05</span>
+                <span class="icon">&#9608;&#9608;</span>
                 <span>俄罗斯方块</span>
                 <span class="arrow">&rarr;</span>
             </a>
 
             <a class="cmd fun" href="fortune.html">
                 <span class="num">06</span>
+                <span class="icon">&#9733;</span>
                 <span>灵签占卜</span>
                 <span class="arrow">&rarr;</span>
             </a>
         </div>
 
         <div class="footer">
-            6 entries · press a command to execute
+            6 entries · 输入编号或点击进入
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    var routes = {
+        1: { url: 'https://www.json.cn/?fullscreen', external: true },
+        2: { url: 'timestamp.html', external: false },
+        3: { url: 'hash.html', external: false },
+        4: { url: 'currency-converter.html', external: false },
+        5: { url: 'tetris.html', external: false },
+        6: { url: 'fortune.html', external: false }
+    };
+
+    var input = document.getElementById('cmdInput');
+    var output = document.getElementById('output');
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            var val = parseInt(input.value.trim(), 10);
+            if (routes[val]) {
+                var r = routes[val];
+                if (r.external) {
+                    window.open(r.url, '_blank', 'noopener');
+                } else {
+                    window.location.href = r.url;
+                }
+            } else if (input.value.trim() !== '') {
+                output.innerHTML = '<span class="error">zsh: command not found:</span> <span class="comment">' + input.value.trim() + '</span>';
+                output.className = 'output-line show';
+                input.value = '';
+            }
+        } else if (e.key === 'Escape') {
+            input.value = '';
+            output.className = 'output-line';
+        }
+    });
+
+    // Click anywhere to focus input
+    document.querySelector('.content').addEventListener('click', function(e) {
+        if (e.target.tagName !== 'A') {
+            input.focus();
+        }
+    });
+})();
+</script>
 
 </body>
 </html>

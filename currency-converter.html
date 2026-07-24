@@ -65,6 +65,13 @@
         }
         .header .subtitle { font-size: 12px; color: var(--text-secondary); letter-spacing: 1px; }
 
+        .back-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 12px; margin-bottom: 12px; transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--text); }
+
         .input-section { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
 
         .currency-row {
@@ -191,6 +198,7 @@
             <span class="term-label">zsy@macbook — currency</span>
         </div>
         <div class="container">
+        <a class="back-link" href="index.html">← cd ..</a>
         <div class="header">
             <h1>$ currency-converter</h1>
             <div class="subtitle">CNY · USD · 可选币种</div>

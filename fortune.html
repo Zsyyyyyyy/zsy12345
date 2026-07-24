@@ -22,13 +22,34 @@
 
   body {
     font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    background: var(--bg);
+    background: #000;
     color: var(--text);
     min-height: 100vh;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
+    padding: 40px 20px;
+  }
+
+  .term {
+    width: 100%; max-width: 480px;
+    background: #0d0d0d; border: 1px solid #262626;
+    border-radius: 10px; overflow: hidden;
+    position: relative; z-index: 1;
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; background: #151515;
+    border-bottom: 1px solid #262626;
+  }
+  .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .term-dot.r { background: #ff5f56; }
+  .term-dot.y { background: #ffbd2e; }
+  .term-dot.g { background: #27c93f; }
+  .term-label {
+    margin-left: 8px; font-size: 12px; color: #555;
+    font-family: "SF Mono","Monaco",monospace;
   }
 
   /* --- Particles Background --- */
@@ -356,6 +377,14 @@
 
 <canvas id="particles"></canvas>
 
+<div class="term">
+    <div class="term-bar">
+        <span class="term-dot r"></span>
+        <span class="term-dot y"></span>
+        <span class="term-dot g"></span>
+        <span class="term-label">zsy@macbook — fortune</span>
+    </div>
+
 <div class="app">
   <div class="header">
     <h1>灵 签 占 卜</h1>
@@ -385,6 +414,7 @@
     </div>
     <div id="viewResult" style="display:none"></div>
   </div>
+</div>
 
   <div class="footer">心诚则灵 · 仅供参考 · 不可尽信</div>
 </div>

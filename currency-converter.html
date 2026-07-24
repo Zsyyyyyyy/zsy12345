@@ -95,6 +95,7 @@
         .icon-thb { background: rgba(34,197,94,0.15); color: #22c55e; }
         .icon-twd { background: rgba(245,158,11,0.15); color: #f59e0b; }
         .icon-rub { background: rgba(168,85,247,0.15); color: #a855f7; }
+        .icon-vnd { background: rgba(20,184,166,0.15); color: #14b8a6; }
 
         .currency-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
         .currency-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -236,6 +237,7 @@
                         <option value="THB">THB · 泰铢</option>
                         <option value="TWD">TWD · 新台币</option>
                         <option value="RUB">RUB · 卢布</option>
+                        <option value="VND">VND · 越南盾</option>
                     </select>
                 </div>
                 <div class="currency-input-wrap"><input type="number" id="inputDynamic" placeholder="0.00" step="any" min="0"></div>
@@ -272,7 +274,7 @@
 
 <script>
 (function() {
-    var rates = { USD: 1, CNY: null, TWD: null, THB: null, RUB: null };
+    var rates = { USD: 1, CNY: null, TWD: null, THB: null, RUB: null, VND: null };
 
     var $ = function(id) { return document.getElementById(id); };
 
@@ -285,10 +287,10 @@
     var errorMsg = $('errorMsg'), loading = $('loading'), updateTime = $('updateTime');
     var resultBanner = $('resultBanner'), resultSource = $('resultSource'), resultTargets = $('resultTargets');
 
-    var curNames = { THB:'泰铢', TWD:'新台币', RUB:'卢布', CNY:'人民币', USD:'美元' };
-    var curSymbols = { THB:'฿ ', TWD:'NT$ ', RUB:'₽ ', CNY:'¥ ', USD:'$ ' };
-    var curIcons = { THB:'฿', TWD:'NT$', RUB:'₽' };
-    var curIconClasses = { THB:'icon-thb', TWD:'icon-twd', RUB:'icon-rub' };
+    var curNames = { THB:'泰铢', TWD:'新台币', RUB:'卢布', VND:'越南盾', CNY:'人民币', USD:'美元' };
+    var curSymbols = { THB:'฿ ', TWD:'NT$ ', RUB:'₽ ', VND:'₫ ', CNY:'¥ ', USD:'$ ' };
+    var curIcons = { THB:'฿', TWD:'NT$', RUB:'₽', VND:'₫' };
+    var curIconClasses = { THB:'icon-thb', TWD:'icon-twd', RUB:'icon-rub', VND:'icon-vnd' };
 
     function getSelectedCurrency() { return currencySelect.value; }
 
@@ -300,7 +302,7 @@
     function fmt(n, d) { return (n==null||isNaN(n)) ? '--' : Number(n).toFixed(d||2); }
     function fmtMoney(n, c) {
         if (n==null||isNaN(n)) return '--';
-        var dec = (c==='TWD') ? 0 : 2;
+        var dec = (c==='TWD' || c==='VND') ? 0 : 2;
         return (curSymbols[c]||'') + Number(n).toFixed(dec);
     }
 
@@ -339,7 +341,8 @@
             rates.TWD = data.rates.TWD;
             rates.THB = data.rates.THB;
             rates.RUB = data.rates.RUB;
-            if (!rates.CNY || !rates.TWD || !rates.THB || !rates.RUB) throw new Error('Missing data');
+            rates.VND = data.rates.VND;
+            if (!rates.CNY || !rates.TWD || !rates.THB || !rates.RUB || !rates.VND) throw new Error('Missing data');
             var now = new Date();
             updateTime.textContent = '更新于 '+now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
             updateRateDisplay();
@@ -348,7 +351,7 @@
         } catch(e) {
             loading.classList.remove('show');
             console.error('Fetch rates failed:', e);
-            rates.CNY = 7.25; rates.TWD = 32.5; rates.THB = 34.5; rates.RUB = 90.0;
+            rates.CNY = 7.25; rates.TWD = 32.5; rates.THB = 34.5; rates.RUB = 90.0; rates.VND = 25400.0;
             updateTime.textContent = '离线估算';
             updateRateDisplay();
             $('rateUSDCNY').textContent += ' (估)';
@@ -407,7 +410,7 @@
         targets.forEach(function(c) {
             if (c === 'CNY') { rowCNY.classList.add('result'); inputCNY.value = all.CNY.toFixed(2); }
             else if (c === 'USD') { rowUSD.classList.add('result'); inputUSD.value = all.USD.toFixed(2); }
-            else { rowDynamic.classList.add('result'); inputDynamic.value = all[c].toFixed(c==='TWD'?0:2); }
+            else { rowDynamic.classList.add('result'); inputDynamic.value = all[c].toFixed((c==='TWD'||c==='VND')?0:2); }
         });
     }
 

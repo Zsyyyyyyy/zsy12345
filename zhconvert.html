@@ -222,11 +222,11 @@
                 <button class="btn btn-secondary" id="btnClear">清空</button>
             </div>
 
-            <div class="footer">基于 OpenCC · 本地转换 · 无需联网</div>
+            <div class="footer">基于 OpenCC · 本地运行 · 无需联网</div>
         </div>
     </div>
 
-<script src="https://unpkg.com/opencc-js@1.0.5/dist/umd/conversion.bundle.js"></script>
+<script src="opencc-full.js"></script>
 <script>
 (function() {
     var $ = function(id) { return document.getElementById(id); };
@@ -243,6 +243,7 @@
 
     function buildConverter() {
         var variant = variantSelect.value;
+        if (typeof OpenCC === 'undefined') return;
         if (direction === 's2t') {
             converter = OpenCC.Converter({ from: 'cn', to: variant });
         } else {
@@ -265,7 +266,7 @@
     function showStatus(msg, isError) {
         statusMsg.textContent = msg;
         statusMsg.className = 'status-msg show' + (isError ? ' error' : '');
-        if (!isError) {
+        if (!isError && !msg === '') {
             setTimeout(function() { statusMsg.className = 'status-msg'; }, 2000);
         }
     }
@@ -276,7 +277,7 @@
             showStatus('请输入要转换的文字', true);
             return;
         }
-        if (!converter || typeof OpenCC === 'undefined') {
+        if (!converter) {
             showStatus('转换库加载中，请稍候...', true);
             return;
         }
@@ -305,7 +306,6 @@
         btnT2S.classList.remove('active');
         buildConverter();
         updateLabels();
-        // Swap text for convenience
         if (outputText.value.trim()) {
             var tmp = inputText.value;
             inputText.value = outputText.value;
@@ -373,23 +373,16 @@
     // Auto-convert on input (debounced)
     var timer = null;
     inputText.addEventListener('input', function() {
+        updateCount();
         clearTimeout(timer);
         timer = setTimeout(function() {
-            if (inputText.value.trim()) doConvert();
+            if (inputText.value.trim() && converter) doConvert();
         }, 300);
     });
 
-    // Init
-    function init() {
-        if (typeof OpenCC !== 'undefined') {
-            buildConverter();
-            updateLabels();
-        } else {
-            // Retry if CDN slow
-            setTimeout(init, 200);
-        }
-    }
-    init();
+    // Init — local file loads synchronously before script runs
+    buildConverter();
+    updateLabels();
 })();
 </script>
 </body>

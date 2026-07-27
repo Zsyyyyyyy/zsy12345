@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简繁转换 - Simplified ↔ Traditional</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --card-bg: #111;
+            --card-border: #262626;
+            --text: #d4d4d4;
+            --text-secondary: #666;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --input-bg: #0a0a0a;
+            --input-border: #333;
+            --success: #3fb950;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #000;
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .term {
+            width: 100%; max-width: 640px;
+            background: #0d0d0d; border: 1px solid #262626;
+            border-radius: 10px; overflow: hidden;
+        }
+        .term-bar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 12px 16px; background: #151515;
+            border-bottom: 1px solid #262626;
+        }
+        .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .term-dot.r { background: #ff5f56; }
+        .term-dot.y { background: #ffbd2e; }
+        .term-dot.g { background: #27c93f; }
+        .term-label {
+            margin-left: 8px; font-size: 12px; color: #555;
+            font-family: "SF Mono","Monaco",monospace;
+        }
+
+        .container { padding: 28px 32px 36px; }
+
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 {
+            font-size: 18px; font-weight: 400; color: #d4d4d4;
+            font-family: "SF Mono","Monaco","Consolas",monospace;
+            margin-bottom: 6px; letter-spacing: 0.5px;
+        }
+        .header .subtitle { font-size: 12px; color: var(--text-secondary); letter-spacing: 1px; }
+
+        .back-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 12px; margin-bottom: 12px; transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--text); }
+
+        /* Direction toggle */
+        .dir-toggle {
+            display: flex; align-items: center; justify-content: center;
+            gap: 0; margin-bottom: 20px;
+            background: var(--input-bg); border: 2px solid var(--input-border);
+            border-radius: 12px; padding: 4px;
+        }
+        .dir-btn {
+            flex: 1; padding: 10px 16px; border: none; border-radius: 8px;
+            background: transparent; color: var(--text-secondary);
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; font-family: inherit;
+        }
+        .dir-btn.active {
+            background: var(--accent); color: #fff;
+        }
+        .dir-btn:not(.active):hover { color: var(--text); background: rgba(255,255,255,0.04); }
+
+        /* Variant select */
+        .variant-row {
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; margin-bottom: 16px;
+            font-size: 12px; color: var(--text-secondary);
+        }
+        .variant-select {
+            appearance: none; -webkit-appearance: none;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--input-border);
+            border-radius: 8px; padding: 6px 28px 6px 10px;
+            color: var(--text); font-size: 12px; font-weight: 500;
+            cursor: pointer; outline: none; font-family: inherit;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 8px center;
+        }
+        .variant-select:focus { border-color: var(--accent); }
+        .variant-select option { background: #1a1a1a; }
+
+        /* Text areas */
+        .text-section { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .text-box {
+            background: var(--input-bg); border: 2px solid var(--input-border);
+            border-radius: 12px; transition: all 0.25s ease; position: relative;
+        }
+        .text-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+        .text-box-label {
+            font-size: 11px; color: var(--text-secondary); text-transform: uppercase;
+            letter-spacing: 0.5px; padding: 10px 16px 0; font-weight: 500;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .text-box-label .dot-live {
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+        }
+        .text-box textarea {
+            width: 100%; min-height: 120px; padding: 8px 16px 14px;
+            background: transparent; border: none; outline: none; resize: vertical;
+            color: var(--text); font-size: 15px; line-height: 1.7;
+            font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+        }
+        .text-box textarea::placeholder { color: var(--text-secondary); opacity: 0.35; }
+        .text-box.output textarea { color: var(--success); }
+        .text-box.output { border-color: rgba(63,185,80,0.3); }
+
+        .char-count {
+            font-size: 11px; color: var(--text-secondary); padding: 0 16px 8px;
+            text-align: right; opacity: 0.7;
+        }
+
+        /* Buttons */
+        .btn-row { display: flex; gap: 10px; margin-bottom: 12px; }
+        .btn {
+            flex: 1; padding: 12px 20px; border-radius: 10px;
+            font-size: 14px; font-weight: 600; border: none;
+            cursor: pointer; transition: all 0.2s; font-family: inherit;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-secondary {
+            background: transparent; color: var(--text-secondary);
+            border: 2px solid var(--input-border); flex: 0 0 100px;
+        }
+        .btn-secondary:hover { border-color: var(--text-secondary); color: var(--text); }
+        .btn-copy {
+            background: transparent; color: var(--text-secondary);
+            border: 2px solid var(--input-border); flex: 0 0 100px;
+        }
+        .btn-copy:hover { border-color: var(--success); color: var(--success); }
+
+        .status-msg {
+            display: none; text-align: center; font-size: 13px;
+            color: var(--success); padding: 8px 0; margin-bottom: 4px;
+        }
+        .status-msg.show { display: block; }
+        .status-msg.error { color: #ff7b72; }
+
+        .footer { text-align: center; font-size: 11px; color: var(--text-secondary); opacity: 0.6; }
+
+        @media (max-width: 520px) {
+            .container { padding: 24px 18px; }
+            .text-box textarea { font-size: 14px; }
+            .btn-row { flex-direction: column; }
+            .btn-secondary, .btn-copy { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="term">
+        <div class="term-bar">
+            <span class="term-dot r"></span>
+            <span class="term-dot y"></span>
+            <span class="term-dot g"></span>
+            <span class="term-label">zsy@macbook — zhconvert</span>
+        </div>
+        <div class="container">
+            <a class="back-link" href="index.html">&larr; cd ..</a>
+            <div class="header">
+                <h1>$ zh-convert</h1>
+                <div class="subtitle">简体 &harr; 繁体 互转</div>
+            </div>
+
+            <div class="dir-toggle">
+                <button class="dir-btn active" id="btnS2T" data-dir="s2t">简 &rarr; 繁</button>
+                <button class="dir-btn" id="btnT2S" data-dir="t2s">繁 &rarr; 简</button>
+            </div>
+
+            <div class="variant-row">
+                <span>繁体变体:</span>
+                <select class="variant-select" id="variantSelect">
+                    <option value="tw">台湾 (台)</option>
+                    <option value="hk">香港 (港)</option>
+                    <option value="t">通用繁体</option>
+                </select>
+            </div>
+
+            <div class="text-section">
+                <div class="text-box">
+                    <div class="text-box-label"><span class="dot-live"></span><span id="inputLabel">输入 · 简体中文</span></div>
+                    <textarea id="inputText" placeholder="在此输入要转换的文字..." spellcheck="false"></textarea>
+                    <div class="char-count" id="inputCount">0 字</div>
+                </div>
+                <div class="text-box output">
+                    <div class="text-box-label"><span class="dot-live" style="background:var(--success)"></span><span id="outputLabel">输出 · 繁體中文</span></div>
+                    <textarea id="outputText" placeholder="转换结果将显示在此..." spellcheck="false" readonly></textarea>
+                    <div class="char-count" id="outputCount">0 字</div>
+                </div>
+            </div>
+
+            <div class="status-msg" id="statusMsg"></div>
+
+            <div class="btn-row">
+                <button class="btn btn-primary" id="btnConvert">转换</button>
+                <button class="btn btn-copy" id="btnCopy">复制结果</button>
+                <button class="btn btn-secondary" id="btnClear">清空</button>
+            </div>
+
+            <div class="footer">基于 OpenCC · 本地转换 · 无需联网</div>
+        </div>
+    </div>
+
+<script src="https://unpkg.com/opencc-js@1.0.5/dist/umd/conversion.bundle.js"></script>
+<script>
+(function() {
+    var $ = function(id) { return document.getElementById(id); };
+    var inputText = $('inputText'), outputText = $('outputText');
+    var inputCount = $('inputCount'), outputCount = $('outputCount');
+    var inputLabel = $('inputLabel'), outputLabel = $('outputLabel');
+    var btnS2T = $('btnS2T'), btnT2S = $('btnT2S');
+    var variantSelect = $('variantSelect');
+    var btnConvert = $('btnConvert'), btnClear = $('btnClear'), btnCopy = $('btnCopy');
+    var statusMsg = $('statusMsg');
+    var direction = 's2t';
+
+    var converter = null;
+
+    function buildConverter() {
+        var variant = variantSelect.value;
+        if (direction === 's2t') {
+            converter = OpenCC.Converter({ from: 'cn', to: variant });
+        } else {
+            converter = OpenCC.Converter({ from: variant, to: 'cn' });
+        }
+    }
+
+    function updateLabels() {
+        var variant = variantSelect.value;
+        var variantName = { tw: '台灣', hk: '香港', t: '繁體' }[variant];
+        if (direction === 's2t') {
+            inputLabel.textContent = '输入 · 简体中文';
+            outputLabel.textContent = '输出 · ' + variantName + '中文';
+        } else {
+            inputLabel.textContent = '输入 · ' + variantName + '中文';
+            outputLabel.textContent = '输出 · 简体中文';
+        }
+    }
+
+    function showStatus(msg, isError) {
+        statusMsg.textContent = msg;
+        statusMsg.className = 'status-msg show' + (isError ? ' error' : '');
+        if (!isError) {
+            setTimeout(function() { statusMsg.className = 'status-msg'; }, 2000);
+        }
+    }
+
+    function doConvert() {
+        var text = inputText.value;
+        if (!text.trim()) {
+            showStatus('请输入要转换的文字', true);
+            return;
+        }
+        if (!converter || typeof OpenCC === 'undefined') {
+            showStatus('转换库加载中，请稍候...', true);
+            return;
+        }
+        var result = converter(text);
+        outputText.value = result;
+        outputCount.textContent = result.length + ' 字';
+    }
+
+    function updateCount() {
+        inputCount.textContent = inputText.value.length + ' 字';
+    }
+
+    function clearAll() {
+        inputText.value = '';
+        outputText.value = '';
+        inputCount.textContent = '0 字';
+        outputCount.textContent = '0 字';
+        statusMsg.className = 'status-msg';
+        inputText.focus();
+    }
+
+    // Direction toggle
+    btnS2T.addEventListener('click', function() {
+        direction = 's2t';
+        btnS2T.classList.add('active');
+        btnT2S.classList.remove('active');
+        buildConverter();
+        updateLabels();
+        // Swap text for convenience
+        if (outputText.value.trim()) {
+            var tmp = inputText.value;
+            inputText.value = outputText.value;
+            outputText.value = '';
+            updateCount();
+        }
+    });
+    btnT2S.addEventListener('click', function() {
+        direction = 't2s';
+        btnT2S.classList.add('active');
+        btnS2T.classList.remove('active');
+        buildConverter();
+        updateLabels();
+        if (outputText.value.trim()) {
+            inputText.value = outputText.value;
+            outputText.value = '';
+            updateCount();
+        }
+    });
+
+    // Variant change
+    variantSelect.addEventListener('change', function() {
+        buildConverter();
+        updateLabels();
+        if (inputText.value.trim()) doConvert();
+    });
+
+    // Convert button
+    btnConvert.addEventListener('click', doConvert);
+
+    // Clear button
+    btnClear.addEventListener('click', clearAll);
+
+    // Copy button
+    btnCopy.addEventListener('click', function() {
+        if (!outputText.value.trim()) {
+            showStatus('没有可复制的内容', true);
+            return;
+        }
+        outputText.select();
+        try {
+            document.execCommand('copy');
+            showStatus('已复制到剪贴板');
+        } catch(e) {
+            navigator.clipboard.writeText(outputText.value).then(function() {
+                showStatus('已复制到剪贴板');
+            }).catch(function() {
+                showStatus('复制失败', true);
+            });
+        }
+        outputText.blur();
+    });
+
+    // Real-time input count
+    inputText.addEventListener('input', updateCount);
+
+    // Ctrl+Enter to convert
+    inputText.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            doConvert();
+        }
+    });
+
+    // Auto-convert on input (debounced)
+    var timer = null;
+    inputText.addEventListener('input', function() {
+        clearTimeout(timer);
+        timer = setTimeout(function() {
+            if (inputText.value.trim()) doConvert();
+        }, 300);
+    });
+
+    // Init
+    function init() {
+        if (typeof OpenCC !== 'undefined') {
+            buildConverter();
+            updateLabels();
+        } else {
+            // Retry if CDN slow
+            setTimeout(init, 200);
+        }
+    }
+    init();
+})();
+</script>
+</body>
+</html>

@@ -146,6 +146,7 @@
         .cmd.ext .num { color: #d2a8ff; }
         .cmd.game .num { color: #ff7b72; }
         .cmd.fun .num { color: #ffa657; }
+        .cmd.note .num { color: #3fb950; }
 
         .footer {
             margin-top: 28px;
@@ -173,7 +174,7 @@
 
     <div class="content">
         <div class="prompt-line">
-            <span class="user">zsy</span><span class="prompt">@</span><span class="host">macbook</span><span class="prompt">:</span><span class="path">~/tools</span><span class="prompt">$</span> <input class="cmd-input" id="cmdInput" type="text" placeholder="输入 1-6..." autofocus>
+            <span class="user">zsy</span><span class="prompt">@</span><span class="host">macbook</span><span class="prompt">:</span><span class="path">~/tools</span><span class="prompt">$</span> <input class="cmd-input" id="cmdInput" type="text" placeholder="输入 1-8..." autofocus>
         </div>
 
         <div class="output-line" id="output"></div>
@@ -228,10 +229,17 @@
                 <span>简繁转换</span>
                 <span class="arrow">&rarr;</span>
             </a>
+
+            <a class="cmd note" href="notes.html">
+                <span class="num">08</span>
+                <span class="icon">&#128221;</span>
+                <span>笔记本</span>
+                <span class="arrow">&rarr;</span>
+            </a>
         </div>
 
         <div class="footer">
-            7 entries · 输入编号或点击进入
+            8 entries · 输入编号或点击进入
         </div>
     </div>
 </div>
@@ -245,7 +253,8 @@
         4: { url: 'currency-converter.html', external: false },
         5: { url: 'tetris.html', external: false },
         6: { url: 'fortune.html', external: false },
-        7: { url: 'zhconvert.html', external: false }
+        7: { url: 'zhconvert.html', external: false },
+        8: { url: 'notes.html', external: false }
     };
 
     var input = document.getElementById('cmdInput');

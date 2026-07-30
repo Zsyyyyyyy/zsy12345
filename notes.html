@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>笔记本</title>
+    <style>
+        *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
+        :root {
+            --bg: #0a0a0a; --card-bg: #111; --card-border: #262626;
+            --text: #d4d4d4; --text-secondary: #888;
+            --accent: #58a6ff; --accent-hover: #79c0ff;
+            --input-bg: #0a0a0a; --input-border: #333;
+            --success: #3fb950; --danger: #f85149; --warn: #d2991d;
+            --cat-work: #58a6ff; --cat-life: #3fb950; --cat-study: #d2991d; --cat-other: #8b949e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000; color: var(--text);
+            min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
+            padding: 24px 20px;
+        }
+
+        .note-app { width: 100%; max-width: 780px; margin-top: 16px; }
+
+        /* Terminal frame */
+        .term {
+            width: 100%; background: #0d0d0d; border: 1px solid #262626;
+            border-radius: 10px; overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+        }
+        .term-bar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 13px 16px; background: #151515;
+            border-bottom: 1px solid #262626;
+        }
+        .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .term-dot.r { background: #ff5f56; }
+        .term-dot.y { background: #ffbd2e; }
+        .term-dot.g { background: #27c93f; }
+        .term-label { margin-left: 10px; font-size: 13px; color: #555; }
+
+        .container { padding: 26px 30px 30px; }
+
+        .back-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 13px; margin-bottom: 18px; transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--text); }
+
+        /* ===== Board header ===== */
+        .board-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+        .board-head h1 { font-size: 22px; font-weight: 500; color: #e8e8e8; letter-spacing: 1px; }
+        .board-count { font-size: 13px; color: #555; margin-right: auto; }
+
+        .search-box { position: relative; }
+        .search-box input {
+            width: 190px; padding: 9px 12px 9px 32px;
+            background: var(--input-bg); color: var(--text);
+            border: 1px solid var(--input-border); border-radius: 6px;
+            font-size: 13px; outline: none; transition: border-color 0.2s;
+        }
+        .search-box input:focus { border-color: #444; }
+        .search-box::before {
+            content: "⌕"; position: absolute; left: 11px; top: 50%;
+            transform: translateY(-50%); color: #555; font-size: 15px;
+        }
+
+        .btn-new {
+            padding: 9px 18px; background: rgba(88,166,255,0.12); color: var(--accent);
+            border: 1px solid rgba(88,166,255,0.3); border-radius: 6px;
+            cursor: pointer; font-size: 14px; transition: all 0.2s; white-space: nowrap;
+        }
+        .btn-new:hover { background: rgba(88,166,255,0.2); border-color: rgba(88,166,255,0.5); }
+
+        .btn-lock-ic {
+            padding: 9px 12px; background: #161616; color: #888;
+            border: 1px solid #262626; border-radius: 6px;
+            cursor: pointer; font-size: 14px; transition: all 0.2s; line-height: 1;
+        }
+        .btn-lock-ic:hover { border-color: #3a3a3a; color: #ccc; }
+        .btn-lock-ic.on { color: var(--warn); border-color: rgba(210,153,29,0.4); background: rgba(210,153,29,0.08); }
+
+        /* ===== Category tabs ===== */
+        .cat-tabs {
+            display: flex; gap: 8px; margin-bottom: 6px;
+            padding-bottom: 16px; border-bottom: 1px solid #1c1c1c; flex-wrap: wrap;
+        }
+        .cat-tab {
+            padding: 6px 16px; border-radius: 20px; font-size: 13px; cursor: pointer;
+            background: #151515; color: #777; border: 1px solid transparent; transition: all 0.2s;
+        }
+        .cat-tab:hover { color: #aaa; border-color: #333; }
+        .cat-tab.active { background: rgba(88,166,255,0.12); color: var(--accent); border-color: rgba(88,166,255,0.35); }
+        .cat-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; margin-bottom: 1px; }
+        .cat-dot.work { background: var(--cat-work); }
+        .cat-dot.life { background: var(--cat-life); }
+        .cat-dot.study { background: var(--cat-study); }
+        .cat-dot.other { background: var(--cat-other); }
+
+        /* ===== Thread list ===== */
+        .thread { display: block; text-decoration: none; border-bottom: 1px solid #161616; cursor: pointer; transition: background 0.15s; }
+        .thread:last-child { border-bottom: none; }
+        .thread-inner { display: flex; align-items: center; gap: 18px; padding: 18px 10px; }
+        .thread:hover { background: #121212; }
+        .thread:hover .thread-title { color: var(--accent-hover); }
+        .thread:hover .thread-arrow { transform: translateX(4px); color: var(--accent); }
+
+        .thread-num { font-size: 13px; color: #3a3a3a; min-width: 38px; text-align: right; flex-shrink: 0; }
+        .thread-main { flex: 1; min-width: 0; }
+        .thread-title {
+            font-size: 16px; font-weight: 500; color: #e0e0e0;
+            margin-bottom: 6px; word-break: break-word; transition: color 0.15s; line-height: 1.4;
+        }
+        .thread-preview {
+            font-size: 13px; color: #666; line-height: 1.5;
+            display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+            overflow: hidden; word-break: break-word; margin-bottom: 8px;
+        }
+        .thread-meta { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #4a4a4a; flex-wrap: wrap; }
+
+        .badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 9px; border-radius: 10px; font-size: 11px; flex-shrink: 0;
+        }
+        .badge.work { background: rgba(88,166,255,0.12); color: var(--cat-work); }
+        .badge.life { background: rgba(63,185,80,0.12); color: var(--cat-life); }
+        .badge.study { background: rgba(210,153,29,0.12); color: var(--cat-study); }
+        .badge.other { background: rgba(139,148,158,0.12); color: var(--cat-other); }
+
+        .thread-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+        .thread-date { font-size: 12px; color: #4a4a4a; }
+        .thread-arrow { font-size: 20px; color: #333; transition: all 0.15s; line-height: 1; }
+
+        .empty { text-align: center; padding: 60px 20px; color: #3d3d3d; }
+        .empty-icon { font-size: 40px; margin-bottom: 14px; }
+        .empty-text { font-size: 14px; }
+
+        /* ===== Read view ===== */
+        #readView { display: none; }
+        .post-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+        .post-title { font-size: 24px; font-weight: 600; color: #f0f0f0; line-height: 1.35; word-break: break-word; flex: 1; }
+        .post-head .badge { margin-top: 6px; }
+        .post-meta {
+            display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+            font-size: 13px; color: #555; padding-bottom: 18px; margin-bottom: 22px;
+            border-bottom: 1px solid #1c1c1c;
+        }
+        .post-meta .sep { color: #2a2a2a; }
+        .post-content {
+            font-size: 16px; line-height: 1.9; color: #c8c8c8;
+            white-space: pre-wrap; word-break: break-word; min-height: 120px;
+        }
+        .post-actions {
+            display: flex; gap: 10px; margin-top: 28px; padding-top: 20px;
+            border-top: 1px solid #1c1c1c;
+        }
+        .btn-act {
+            padding: 9px 20px; border-radius: 6px; font-size: 13px; cursor: pointer;
+            background: #161616; color: #999; border: 1px solid #262626; transition: all 0.2s;
+        }
+        .btn-act:hover { border-color: #3a3a3a; color: #ccc; background: #1a1a1a; }
+        .btn-act.primary { background: rgba(88,166,255,0.12); color: var(--accent); border-color: rgba(88,166,255,0.3); }
+        .btn-act.primary:hover { background: rgba(88,166,255,0.2); }
+        .btn-act.danger:hover { border-color: rgba(248,81,73,0.4); color: var(--danger); background: rgba(248,81,73,0.06); }
+
+        /* ===== Modal (editor & settings) ===== */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+            z-index: 100; align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            width: 100%; max-width: 640px; background: #0d0d0d; border: 1px solid #262626;
+            border-radius: 10px; overflow: hidden; animation: slideUp 0.2s ease;
+        }
+        .modal.small { max-width: 440px; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 13px 16px; background: #151515; border-bottom: 1px solid #262626;
+        }
+        .modal-bar .dots { display: flex; gap: 6px; }
+        .modal-bar .dot { width: 11px; height: 11px; border-radius: 50%; }
+        .modal-bar .dot.r { background: #ff5f56; cursor: pointer; }
+        .modal-bar .dot.y { background: #ffbd2e; }
+        .modal-bar .dot.g { background: #27c93f; }
+        .modal-title { font-size: 13px; color: #555; }
+        .modal-body { padding: 22px 24px 24px; }
+
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; font-size: 13px; color: #777; margin-bottom: 8px; }
+        .form-input, .form-textarea, .form-select {
+            width: 100%; padding: 11px 13px; background: var(--input-bg); color: var(--text);
+            border: 1px solid var(--input-border); border-radius: 6px;
+            font-size: 14px; outline: none; transition: border-color 0.2s;
+        }
+        .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: #4a4a4a; }
+        .form-textarea { min-height: 220px; resize: vertical; line-height: 1.7; }
+        .form-select {
+            appearance: none; cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+        }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; flex-wrap: wrap; }
+        .btn { padding: 9px 22px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-cancel { background: #1a1a1a; color: #999; }
+        .btn-cancel:hover { background: #222; color: #bbb; }
+        .btn-primary { background: rgba(88,166,255,0.15); color: var(--accent); }
+        .btn-primary:hover { background: rgba(88,166,255,0.25); }
+        .btn-danger { background: rgba(248,81,73,0.1); color: var(--danger); }
+        .btn-danger:hover { background: rgba(248,81,73,0.18); }
+
+        /* ===== Lock overlay ===== */
+        .lock-overlay {
+            display: none; position: fixed; inset: 0; background: #000; z-index: 500;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .lock-overlay.show { display: flex; }
+        .lock-box { width: 100%; max-width: 420px; }
+        .lock-body { padding: 34px 32px 30px; text-align: center; }
+        .lock-icon { font-size: 34px; margin-bottom: 14px; }
+        .lock-cmd { font-size: 14px; color: #7ee787; margin-bottom: 8px; text-align: left; }
+        .lock-cmd .p { color: #d2a8ff; }
+        .lock-hint { font-size: 13px; color: #666; margin-bottom: 24px; }
+        .lock-body input {
+            width: 100%; padding: 12px 14px; margin-bottom: 12px;
+            background: var(--input-bg); color: var(--text);
+            border: 1px solid var(--input-border); border-radius: 6px;
+            font-size: 14px; outline: none; text-align: center; letter-spacing: 2px;
+            transition: border-color 0.2s;
+        }
+        .lock-body input:focus { border-color: #4a4a4a; }
+        .lock-error { min-height: 20px; font-size: 13px; color: var(--danger); margin-bottom: 8px; }
+        .btn-lock {
+            width: 100%; padding: 12px; background: rgba(88,166,255,0.15); color: var(--accent);
+            border: 1px solid rgba(88,166,255,0.3); border-radius: 6px;
+            cursor: pointer; font-size: 15px; transition: all 0.2s;
+        }
+        .btn-lock:hover { background: rgba(88,166,255,0.25); }
+        .lock-skip {
+            display: inline-block; margin-top: 16px; font-size: 13px; color: #555;
+            cursor: pointer; text-decoration: none; transition: color 0.2s;
+        }
+        .lock-skip:hover { color: #999; }
+
+        .shake { animation: shake 0.4s ease; }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20%,60% { transform: translateX(-8px); }
+            40%,80% { transform: translateX(8px); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+            padding: 11px 22px; background: #1a1a1a; color: #aaa; border: 1px solid #333;
+            border-radius: 8px; font-size: 13px; z-index: 600; pointer-events: none;
+            animation: fadeInUp 0.3s ease;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        @media (max-width: 640px) {
+            body { padding: 12px; }
+            .container { padding: 18px 16px 22px; }
+            .board-head h1 { font-size: 19px; }
+            .search-box input { width: 100%; }
+            .search-box { width: 100%; order: 3; }
+            .thread-num { display: none; }
+            .post-title { font-size: 20px; }
+            .post-content { font-size: 15px; }
+            .thread-side { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="note-app">
+    <div class="term">
+        <div class="term-bar">
+            <div class="term-dot r"></div>
+            <div class="term-dot y"></div>
+            <div class="term-dot g"></div>
+            <div class="term-label">notes — forum</div>
+        </div>
+        <div class="container">
+            <a href="index.html" class="back-link">← cd ..</a>
+
+            <!-- ===== List / board view ===== -->
+            <div id="listView">
+                <div class="board-head">
+                    <h1>笔记本</h1>
+                    <span class="board-count" id="boardCount"></span>
+                    <div class="search-box">
+                        <input id="searchInput" type="text" placeholder="搜索标题 / 内容...">
+                    </div>
+                    <button class="btn-lock-ic" id="lockBtn" onclick="openLockSettings()" title="密码保护">🔓</button>
+                    <button class="btn-new" onclick="openModal()">+ 新帖</button>
+                </div>
+
+                <div class="cat-tabs" id="catTabs">
+                    <div class="cat-tab active" data-cat="all">全部</div>
+                    <div class="cat-tab" data-cat="work"><span class="cat-dot work"></span>工作</div>
+                    <div class="cat-tab" data-cat="life"><span class="cat-dot life"></span>生活</div>
+                    <div class="cat-tab" data-cat="study"><span class="cat-dot study"></span>学习</div>
+                    <div class="cat-tab" data-cat="other"><span class="cat-dot other"></span>其他</div>
+                </div>
+
+                <div id="threadList"></div>
+            </div>
+
+            <!-- ===== Read / post view ===== -->
+            <div id="readView">
+                <a class="back-link" onclick="backToList()" style="cursor:pointer">← 返回列表</a>
+                <div class="post-head">
+                    <h2 class="post-title" id="postTitle"></h2>
+                    <span class="badge" id="postBadge"></span>
+                </div>
+                <div class="post-meta" id="postMeta"></div>
+                <div class="post-content" id="postContent"></div>
+                <div class="post-actions">
+                    <button class="btn-act primary" onclick="editCurrent()">编辑</button>
+                    <button class="btn-act danger" onclick="deleteCurrent()">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Lock overlay ===== -->
+<div class="lock-overlay" id="lockOverlay">
+    <div class="lock-box term">
+        <div class="term-bar">
+            <div class="term-dot r"></div>
+            <div class="term-dot y"></div>
+            <div class="term-dot g"></div>
+            <div class="term-label" id="lockTermLabel">notes — locked</div>
+        </div>
+        <div class="lock-body">
+            <!-- unlock -->
+            <div id="lockUnlock">
+                <div class="lock-icon">🔒</div>
+                <div class="lock-cmd"><span class="p">$</span> ./unlock_notes</div>
+                <div class="lock-hint">此笔记本已加密，请输入密码继续</div>
+                <input type="password" id="lockPass" placeholder="输入密码" autocomplete="current-password">
+                <div class="lock-error" id="lockError"></div>
+                <button class="btn-lock" onclick="tryUnlock()">解锁</button>
+            </div>
+            <!-- first-time setup -->
+            <div id="lockSetup" style="display:none">
+                <div class="lock-icon">🔑</div>
+                <div class="lock-cmd"><span class="p">$</span> ./set_password</div>
+                <div class="lock-hint">为你的笔记本设置一个访问密码</div>
+                <input type="password" id="setupPass1" placeholder="设置密码" autocomplete="new-password">
+                <input type="password" id="setupPass2" placeholder="确认密码" autocomplete="new-password">
+                <div class="lock-error" id="setupError"></div>
+                <button class="btn-lock" onclick="doSetup()">启用密码</button>
+                <a class="lock-skip" onclick="skipSetup()">暂不设置，直接进入 →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Lock settings modal ===== -->
+<div class="modal-overlay" id="lockSettingsOverlay" style="z-index:300">
+    <div class="modal small">
+        <div class="modal-bar">
+            <div class="dots">
+                <div class="dot r" onclick="closeLockSettings()"></div>
+                <div class="dot y"></div>
+                <div class="dot g"></div>
+            </div>
+            <div class="modal-title">密码保护</div>
+            <div style="width:30px"></div>
+        </div>
+        <div class="modal-body">
+            <div class="form-group" style="margin-bottom:14px">
+                <label class="form-label">当前状态</label>
+                <div style="font-size:14px;color:#bbb" id="lsStatus">未启用</div>
+            </div>
+            <div class="form-group" id="lsCurrentWrap" style="display:none">
+                <label class="form-label">当前密码</label>
+                <input class="form-input" type="password" id="lsCurrentInput" placeholder="输入当前密码" autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">新密码</label>
+                <input class="form-input" type="password" id="lsNew1" placeholder="设置新密码" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">确认新密码</label>
+                <input class="form-input" type="password" id="lsNew2" placeholder="再次输入新密码" autocomplete="new-password">
+            </div>
+            <div class="lock-error" id="lsError" style="text-align:left;margin-bottom:0"></div>
+            <div class="modal-actions">
+                <button class="btn btn-danger" id="btnLsRemove" onclick="removeLock()" style="display:none;margin-right:auto">取消保护</button>
+                <button class="btn btn-cancel" id="btnLsLockNow" onclick="lockNow()" style="display:none">立即锁定</button>
+                <button class="btn btn-cancel" onclick="closeLockSettings()">关闭</button>
+                <button class="btn btn-primary" onclick="saveLockSettings()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Editor modal ===== -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <div class="modal-bar">
+            <div class="dots">
+                <div class="dot r" onclick="closeModal()"></div>
+                <div class="dot y"></div>
+                <div class="dot g"></div>
+            </div>
+            <div class="modal-title" id="modalTitle">新帖</div>
+            <div style="width:30px"></div>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">标题</label>
+                <input class="form-input" id="noteTitle" placeholder="帖子标题..." maxlength="120">
+            </div>
+            <div class="form-group">
+                <label class="form-label">版块</label>
+                <select class="form-select" id="noteCat">
+                    <option value="work">工作</option>
+                    <option value="life">生活</option>
+                    <option value="study">学习</option>
+                    <option value="other">其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">内容</label>
+                <textarea class="form-textarea" id="noteContent" placeholder="写点什么..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" id="btnSave" onclick="saveNote()">发布</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" style="display:none"></div>
+
+<script>
+(function() {
+    'use strict';
+
+    var notes = [];
+    var currentCat = 'all';
+    var searchQuery = '';
+    var readingId = null;
+    var editingId = null;
+    var unlocked = false;
+
+    var $ = function(id) { return document.getElementById(id); };
+    var STORAGE_KEY = 'zsy_notes';
+    var LOCK_KEY = 'zsy_notes_lock'; // absent=未配置, 'off'=无密码, '<hash>'=已设密码
+
+    /* ---------- SHA-256 (pure JS, UTF-8 safe) ---------- */
+    function utf8(s){ return unescape(encodeURIComponent(s)); }
+    function sha256(ascii) {
+        function rr(v,a){ return (v>>>a)|(v<<(32-a)); }
+        var mp=Math.pow, mw=mp(2,32), res='', words=[], bitLen=ascii.length*8;
+        var hash=sha256.h=sha256.h||[], k=sha256.k=sha256.k||[], pc=k.length, comp={};
+        for(var c=2; pc<64; c++){ if(!comp[c]){ for(var i=0;i<313;i+=c) comp[i]=c; hash[pc]=(mp(c,.5)*mw)|0; k[pc++]=(mp(c,1/3)*mw)|0; } }
+        ascii+='\x80'; while(ascii.length%64-56) ascii+='\x00';
+        for(var i=0;i<ascii.length;i++){ var j=ascii.charCodeAt(i); if(j>>8) return ''; words[i>>2]|=j<<((3-i)%4)*8; }
+        words[words.length]=(bitLen/mw)|0; words[words.length]=bitLen;
+        for(var j=0;j<words.length;){
+            var w=words.slice(j,j+=16), old=hash; hash=hash.slice(0,8);
+            for(var i=0;i<64;i++){
+                var w15=w[i-15], w2=w[i-2], a=hash[0], e=hash[4];
+                var t1=hash[7]+(rr(e,6)^rr(e,11)^rr(e,25))+((e&hash[5])^((~e)&hash[6]))+k[i]
+                    +(w[i]=(i<16)?w[i]:(w[i-16]+(rr(w15,7)^rr(w15,18)^(w15>>>3))+w[i-7]+(rr(w2,17)^rr(w2,19)^(w2>>>10)))|0);
+                var t2=(rr(a,2)^rr(a,13)^rr(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+                hash=[(t1+t2)|0].concat(hash); hash[4]=(hash[4]+t1)|0;
+            }
+            for(var i=0;i<8;i++) hash[i]=(hash[i]+old[i])|0;
+        }
+        for(var i=0;i<8;i++) for(var j=3;j+1;j--){ var b=(hash[i]>>(j*8))&255; res+=((b<16)?0:'')+b.toString(16); }
+        return res;
+    }
+    function hashOf(p){ return sha256(utf8(p)); }
+
+    /* ---------- Lock state ---------- */
+    function getLockState(){
+        var v = localStorage.getItem(LOCK_KEY);
+        if (v === null) return 'unset';
+        if (v === 'off') return 'off';
+        return 'set';
+    }
+    function updateLockBtn(){
+        var b = $('lockBtn'), st = getLockState();
+        if (st === 'set') { b.textContent = '🔒'; b.classList.add('on'); b.title = '密码保护（已启用）'; }
+        else { b.textContent = '🔓'; b.classList.remove('on'); b.title = '密码保护（未启用）'; }
+    }
+    function showLock(mode){
+        $('lockOverlay').classList.add('show');
+        if (mode === 'unlock'){
+            $('lockUnlock').style.display='block'; $('lockSetup').style.display='none';
+            $('lockTermLabel').textContent = 'notes — locked';
+            setTimeout(function(){ $('lockPass').focus(); }, 100);
+        } else {
+            $('lockSetup').style.display='block'; $('lockUnlock').style.display='none';
+            $('lockTermLabel').textContent = 'notes — setup';
+            setTimeout(function(){ $('setupPass1').focus(); }, 100);
+        }
+    }
+    function enterApp(){
+        unlocked = true;
+        $('lockOverlay').classList.remove('show');
+        updateLockBtn();
+        renderCatTabs(); renderList();
+    }
+    function resetToListView(){
+        readingId = null;
+        $('readView').style.display='none';
+        $('listView').style.display='block';
+    }
+
+    window.tryUnlock = function(){
+        var p = $('lockPass').value;
+        if (hashOf(p) === localStorage.getItem(LOCK_KEY)){
+            $('lockPass').value=''; $('lockError').textContent='';
+            resetToListView(); enterApp();
+        } else {
+            var box = $('lockUnlock');
+            box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+            $('lockError').textContent = 'zsh: 密码错误，请重试';
+            $('lockPass').value=''; $('lockPass').focus();
+        }
+    };
+    window.doSetup = function(){
+        var p1=$('setupPass1').value, p2=$('setupPass2').value;
+        if(!p1){ $('setupError').textContent='密码不能为空'; return; }
+        if(p1.length<4){ $('setupError').textContent='密码至少 4 位'; return; }
+        if(p1!==p2){ $('setupError').textContent='两次输入的密码不一致'; return; }
+        localStorage.setItem(LOCK_KEY, hashOf(p1));
+        $('setupPass1').value=''; $('setupPass2').value=''; $('setupError').textContent='';
+        enterApp(); showToast('密码已启用');
+    };
+    window.skipSetup = function(){
+        localStorage.setItem(LOCK_KEY,'off');
+        enterApp();
+    };
+
+    /* ---------- Lock settings modal ---------- */
+    window.openLockSettings = function(){
+        var st = getLockState();
+        $('lsStatus').textContent = st==='set' ? '已启用密码保护' : '未启用密码保护';
+        $('lsStatus').style.color = st==='set' ? '#3fb950' : '#888';
+        $('lsCurrentWrap').style.display = st==='set' ? 'block' : 'none';
+        $('btnLsRemove').style.display = st==='set' ? 'inline-block' : 'none';
+        $('btnLsLockNow').style.display = st==='set' ? 'inline-block' : 'none';
+        $('lsCurrentInput').value=''; $('lsNew1').value=''; $('lsNew2').value=''; $('lsError').textContent='';
+        $('lockSettingsOverlay').classList.add('show');
+    };
+    window.closeLockSettings = function(){ $('lockSettingsOverlay').classList.remove('show'); };
+    $('lockSettingsOverlay').addEventListener('click', function(e){ if(e.target===this) closeLockSettings(); });
+
+    window.saveLockSettings = function(){
+        var st = getLockState();
+        var cur=$('lsCurrentInput').value, n1=$('lsNew1').value, n2=$('lsNew2').value;
+        if (st==='set' && hashOf(cur) !== localStorage.getItem(LOCK_KEY)){ $('lsError').textContent='当前密码错误'; return; }
+        if(!n1){ $('lsError').textContent='新密码不能为空'; return; }
+        if(n1.length<4){ $('lsError').textContent='密码至少 4 位'; return; }
+        if(n1!==n2){ $('lsError').textContent='两次新密码不一致'; return; }
+        localStorage.setItem(LOCK_KEY, hashOf(n1));
+        closeLockSettings(); updateLockBtn();
+        showToast(st==='set' ? '密码已修改' : '密码已启用');
+    };
+    window.removeLock = function(){
+        var cur=$('lsCurrentInput').value;
+        if (hashOf(cur) !== localStorage.getItem(LOCK_KEY)){ $('lsError').textContent='请输入正确的当前密码'; return; }
+        localStorage.setItem(LOCK_KEY,'off');
+        closeLockSettings(); updateLockBtn();
+        showToast('密码保护已取消');
+    };
+    window.lockNow = function(){
+        closeLockSettings();
+        unlocked=false; resetToListView();
+        $('lockPass').value=''; $('lockError').textContent='';
+        showLock('unlock');
+    };
+
+    /* ---------- Notes storage ---------- */
+    function loadNotes() {
+        try { var raw = localStorage.getItem(STORAGE_KEY); notes = raw ? JSON.parse(raw) : []; }
+        catch (e) { notes = []; }
+    }
+    function saveNotes() { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); }
+
+    var catLabels = { work: '工作', life: '生活', study: '学习', other: '其他' };
+    function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function fmtDate(ts){ var d=new Date(ts),p=function(n){return String(n).padStart(2,'0');};
+        return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+    function fmtShort(ts){ var d=new Date(ts),p=function(n){return String(n).padStart(2,'0');};
+        return p(d.getMonth()+1)+'-'+p(d.getDate()); }
+    function pad(n,w){ var s=String(n); while(s.length<w) s='0'+s; return s; }
+
+    function getFiltered() {
+        var list = notes.slice().sort(function(a,b){ return b.updated - a.updated; });
+        if (currentCat !== 'all') list = list.filter(function(n){ return n.cat === currentCat; });
+        if (searchQuery) {
+            var q = searchQuery.toLowerCase();
+            list = list.filter(function(n){
+                return (n.title||'').toLowerCase().indexOf(q) !== -1 ||
+                       (n.content||'').toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        return list;
+    }
+
+    function renderList() {
+        var list = getFiltered();
+        var total = notes.length;
+        $('boardCount').textContent = (searchQuery || currentCat !== 'all') ? list.length + ' / ' + total + ' 帖' : total + ' 帖';
+        var container = $('threadList');
+        if (list.length === 0) {
+            container.innerHTML = '<div class="empty"><div class="empty-icon">🗒</div><div class="empty-text">'
+                + (searchQuery ? '没有匹配的帖子' : (currentCat === 'all' ? '还没有帖子，点「+ 新帖」发第一帖吧' : '这个版块还没有帖子'))
+                + '</div></div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < list.length; i++) {
+            var n = list[i];
+            var preview = (n.content||'').replace(/\s+/g,' ').substring(0, 70);
+            var chars = (n.content||'').length;
+            html += '<div class="thread" onclick="openNote(' + n.id + ')">'
+                + '<div class="thread-inner">'
+                + '<div class="thread-num">#' + pad(list.length - i, 2) + '</div>'
+                + '<div class="thread-main">'
+                + '<div class="thread-title">' + escHtml(n.title || '无标题') + '</div>'
+                + '<div class="thread-preview">' + escHtml(preview || '（无内容）') + '</div>'
+                + '<div class="thread-meta">'
+                + '<span class="badge ' + n.cat + '">' + (catLabels[n.cat] || n.cat) + '</span>'
+                + '<span>' + fmtDate(n.updated) + '</span>'
+                + '<span>约 ' + chars + ' 字</span>'
+                + '</div></div>'
+                + '<div class="thread-side">'
+                + '<span class="thread-date">' + fmtShort(n.updated) + '</span>'
+                + '<span class="thread-arrow">›</span>'
+                + '</div></div></div>';
+        }
+        container.innerHTML = html;
+    }
+    function renderCatTabs() {
+        document.querySelectorAll('#catTabs .cat-tab').forEach(function(t){
+            t.classList.toggle('active', t.dataset.cat === currentCat);
+        });
+    }
+
+    window.openNote = function(id) {
+        if (!unlocked) return;
+        var n = notes.find(function(x){ return x.id === id; });
+        if (!n) return;
+        readingId = id;
+        $('postTitle').textContent = n.title || '无标题';
+        var badge = $('postBadge');
+        badge.textContent = catLabels[n.cat] || n.cat;
+        badge.className = 'badge ' + n.cat;
+        var meta = '发布于 ' + fmtDate(n.created);
+        if (n.updated !== n.created) meta += '<span class="sep">·</span>更新于 ' + fmtDate(n.updated);
+        meta += '<span class="sep">·</span>共 ' + (n.content||'').length + ' 字';
+        $('postMeta').innerHTML = meta;
+        $('postContent').textContent = n.content || '（无内容）';
+        $('listView').style.display = 'none';
+        $('readView').style.display = 'block';
+        window.scrollTo(0, 0);
+    };
+    window.backToList = function() { resetToListView(); renderList(); };
+
+    window.editCurrent = function() { if (readingId !== null) editNote(readingId); };
+    window.deleteCurrent = function() {
+        if (readingId === null) return;
+        if (!confirm('确定删除这条帖子吗？不可撤销。')) return;
+        notes = notes.filter(function(n){ return n.id !== readingId; });
+        saveNotes(); backToList(); showToast('帖子已删除');
+    };
+
+    window.openModal = function() {
+        if (!unlocked) return;
+        editingId = null;
+        $('modalTitle').textContent = '新帖';
+        $('noteTitle').value = '';
+        $('noteCat').value = currentCat !== 'all' ? currentCat : 'work';
+        $('noteContent').value = '';
+        $('btnSave').textContent = '发布';
+        $('modalOverlay').classList.add('show');
+        setTimeout(function(){ $('noteTitle').focus(); }, 100);
+    };
+    window.editNote = function(id) {
+        if (!unlocked) return;
+        var n = notes.find(function(x){ return x.id === id; });
+        if (!n) return;
+        editingId = id;
+        $('modalTitle').textContent = '编辑帖子';
+        $('noteTitle').value = n.title; $('noteCat').value = n.cat; $('noteContent').value = n.content;
+        $('btnSave').textContent = '保存';
+        $('modalOverlay').classList.add('show');
+        setTimeout(function(){ $('noteTitle').focus(); }, 100);
+    };
+    window.closeModal = function() { $('modalOverlay').classList.remove('show'); };
+    $('modalOverlay').addEventListener('click', function(e){ if (e.target === this) closeModal(); });
+
+    window.saveNote = function() {
+        var title = $('noteTitle').value.trim();
+        var cat = $('noteCat').value;
+        var content = $('noteContent').value.trim();
+        if (!title && !content) { showToast('标题和内容不能都为空'); return; }
+        var now = Date.now(), wasEditing = editingId !== null;
+        if (wasEditing) {
+            var idx = notes.findIndex(function(n){ return n.id === editingId; });
+            if (idx !== -1) { notes[idx].title=title; notes[idx].cat=cat; notes[idx].content=content; notes[idx].updated=now; }
+        } else {
+            notes.push({ id: now, title: title, cat: cat, content: content, created: now, updated: now });
+        }
+        saveNotes(); closeModal();
+        if (wasEditing && readingId === editingId) openNote(editingId); else renderList();
+        showToast(wasEditing ? '已保存' : '已发布');
+    };
+
+    var searchTimer;
+    $('searchInput').addEventListener('input', function(){
+        clearTimeout(searchTimer); var v = this.value;
+        searchTimer = setTimeout(function(){ searchQuery = v.trim(); renderList(); }, 200);
+    });
+    $('catTabs').addEventListener('click', function(e){
+        var tab = e.target.closest('.cat-tab'); if (!tab) return;
+        currentCat = tab.dataset.cat; renderCatTabs(); renderList();
+    });
+
+    // Enter to submit on lock inputs
+    $('lockPass').addEventListener('keydown', function(e){ if(e.key==='Enter') tryUnlock(); });
+    $('setupPass2').addEventListener('keydown', function(e){ if(e.key==='Enter') doSetup(); });
+    $('setupPass1').addEventListener('keydown', function(e){ if(e.key==='Enter') $('setupPass2').focus(); });
+
+    document.addEventListener('keydown', function(e){
+        var modalOpen = $('modalOverlay').classList.contains('show');
+        var settingsOpen = $('lockSettingsOverlay').classList.contains('show');
+        if (e.key === 'Escape') {
+            if (modalOpen) closeModal();
+            else if (settingsOpen) closeLockSettings();
+            else if (unlocked && readingId !== null) backToList();
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && modalOpen) { e.preventDefault(); saveNote(); }
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'n' || e.key === 'N') && !modalOpen && unlocked) { e.preventDefault(); openModal(); }
+    });
+
+    var toastTimer;
+    function showToast(msg) {
+        var el = $('toast'); el.textContent = msg; el.style.display = 'block';
+        clearTimeout(toastTimer); toastTimer = setTimeout(function(){ el.style.display = 'none'; }, 1800);
+    }
+
+    /* ---------- Init ---------- */
+    loadNotes();
+    updateLockBtn();
+    var st = getLockState();
+    if (st === 'set') showLock('unlock');
+    else if (st === 'unset') showLock('setup');
+    else enterApp();
+})();
+</script>
+
+</body>
+</html>

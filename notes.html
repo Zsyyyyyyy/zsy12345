@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>笔记本</title>
     <script src="marked.min.js"></script>
+    <script src="notes-data.js"></script>
     <style>
         *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
         :root {
@@ -246,7 +247,7 @@
                         <input id="searchInput" type="text" placeholder="搜索标题 / 内容...">
                     </div>
                 </div>
-                <div class="hint">在 <code>notes/&lt;地区&gt;/</code> 里新建或编辑 <code>.md</code> 文件，刷新即可看到</div>
+                <div class="hint">在 <code>notes/&lt;地区&gt;/</code> 里编辑 <code>.md</code>，再运行 <code>node build-notes.js</code> 刷新即可</div>
                 <div class="region-tabs" id="regionTabs"></div>
                 <div id="threadList"></div>
             </div>
@@ -472,18 +473,20 @@
     function showLoadError() {
         $('listView').innerHTML =
             '<div class="load-err">'
-            + '<div class="t">无法读取笔记数据</div>'
-            + '<div class="d">这个页面需要通过本地服务打开才能读取 notes/ 目录里的 .md 文件<br>（直接双击 file:// 打开是读不到的）</div>'
-            + '<div class="cmd">node server.js</div>'
-            + '<div class="d" style="margin-top:12px">然后访问 <span style="color:#58a6ff">http://localhost:8080/notes.html</span></div>'
+            + '<div class="t">还没有笔记数据</div>'
+            + '<div class="d">先在项目目录运行一次下面的命令，把 notes/ 里的 .md 打包成数据文件</div>'
+            + '<div class="cmd">node build-notes.js</div>'
+            + '<div class="d" style="margin-top:12px">以后每次改完笔记，重跑一次这个命令，刷新即可看到</div>'
             + '</div>';
     }
 
     function loadNotes() {
-        fetch('/api/notes', { cache: 'no-store' })
-            .then(function(r){ if (!r.ok) throw new Error('bad'); return r.json(); })
-            .then(function(data){ notes = data || []; renderTabs(); renderList(); })
-            .catch(function(){ showLoadError(); });
+        if (window.NOTES_DATA && Array.isArray(window.NOTES_DATA)) {
+            notes = window.NOTES_DATA;
+            renderTabs(); renderList();
+        } else {
+            showLoadError();
+        }
     }
 
     /* ===== Init ===== */

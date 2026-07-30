@@ -302,10 +302,10 @@
 
                 <div class="cat-tabs" id="catTabs">
                     <div class="cat-tab active" data-cat="all">全部</div>
-                    <div class="cat-tab" data-cat="work"><span class="cat-dot work"></span>工作</div>
-                    <div class="cat-tab" data-cat="life"><span class="cat-dot life"></span>生活</div>
-                    <div class="cat-tab" data-cat="study"><span class="cat-dot study"></span>学习</div>
-                    <div class="cat-tab" data-cat="other"><span class="cat-dot other"></span>其他</div>
+                    <div class="cat-tab" data-cat="work"><span class="cat-dot work"></span>台湾</div>
+                    <div class="cat-tab" data-cat="life"><span class="cat-dot life"></span>越南</div>
+                    <div class="cat-tab" data-cat="study"><span class="cat-dot study"></span>泰国</div>
+                    <div class="cat-tab" data-cat="other"><span class="cat-dot other"></span>俄罗斯</div>
                 </div>
 
                 <div id="threadList"></div>
@@ -593,7 +593,7 @@
     }
     function saveNotes() { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); }
 
-    var catLabels = { work: '工作', life: '生活', study: '学习', other: '其他' };
+    var catLabels = { work: '台湾', life: '越南', study: '泰国', other: '俄罗斯' };
     function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function fmtDate(ts){ var d=new Date(ts),p=function(n){return String(n).padStart(2,'0');};
         return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }

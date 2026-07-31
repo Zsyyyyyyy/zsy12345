@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>货币转换器 + 定价模拟器</title>
+    <title>货币转换器</title>
     <style>
         *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
 
@@ -17,7 +17,7 @@
         }
 
         .term {
-            max-width: 1100px; margin: 0 auto;
+            max-width: 640px; margin: 0 auto;
             background: #0d0d0d; border: 1px solid #262626;
             border-radius: 10px; overflow: hidden;
         }
@@ -37,14 +37,10 @@
         }
         .back-link:hover { background: #16202c; }
 
-        /* ===== 两栏 50/50 ===== */
-        .layout { display: grid; grid-template-columns: 1fr 1fr; }
-        .col-left  { padding: 20px 20px 24px; border-right: 1px solid #1a1a1a; }
-        .col-right { padding: 20px 20px 24px; background: #0e0e0e; }
+        .content { padding: 22px 22px 26px; }
 
-        /* ===== 左侧：货币转换器 ===== */
-        .sec-h { font-size: 13px; color: #f0883e; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
-        .sec-n { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #f0883e; color: #000; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+        .sec-h { font-size: 14px; color: #f0883e; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
+        .sec-n { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #f0883e; color: #000; font-size: 11px; font-weight: 700; flex-shrink: 0; }
 
         .error-msg { display: none; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 12px; text-align: center; margin-bottom: 12px; }
         .error-msg.show { display: block; }
@@ -141,71 +137,6 @@
         .rate-value { font-size: 16px; font-weight: 700; color: #d4d4d4; }
 
         .footer { text-align: center; font-size: 10px; color: #666; opacity: 0.6; }
-
-        /* ===== 右侧：定价模拟器 ===== */
-        .p-field { margin-bottom: 8px; }
-        .p-field label { display: block; font-size: 11px; color: #adb5bd; margin-bottom: 3px; }
-        .p-field input {
-            width: 100%; padding: 5px 8px; background: #0b0b0b; border: 1px solid #2a2a2a;
-            border-radius: 5px; color: #e6e6e6; font-size: 12px; outline: none;
-        }
-        .p-field input:focus { border-color: #58a6ff; }
-        .p-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-        .p-row2 .p-field { margin-bottom: 0; }
-
-        .markets-row { display: flex; gap: 5px; margin-bottom: 10px; }
-        .mkt {
-            flex: 1; text-align: center; padding: 6px 2px; background: #0b0b0b;
-            border: 1px solid #2a2a2a; border-radius: 6px; cursor: pointer;
-            font-size: 12px; color: #adb5bd; transition: all .15s;
-        }
-        .mkt .rate { display: block; font-size: 10px; color: #6e7681; margin-top: 1px; }
-        .mkt:hover { border-color: #3a3a3a; }
-        .mkt.active { background: #11202c; border-color: #58a6ff; color: #7ee787; }
-        .mkt.active .rate { color: #58a6ff; }
-
-        .p-result { margin-top: 10px; background: #0b0b0b; border: 1px solid #21304a; border-radius: 8px; padding: 10px 12px; }
-        .p-res-item {
-            display: flex; justify-content: space-between; align-items: baseline;
-            padding: 5px 8px; border-radius: 5px; margin-bottom: 3px; font-size: 11.5px;
-        }
-        .p-res-item:nth-child(odd) { background: rgba(255,255,255,.02); }
-        .p-res-label { color: #adb5bd; display: flex; align-items: center; gap: 4px; }
-        .p-res-label .tag { font-size: 9px; padding: 1px 4px; border-radius: 2px; background: #1a2332; color: #58a6ff; }
-        .p-res-val { color: #7ee787; font-weight: 600; text-align: right; }
-        .p-res-val .sub { font-weight: 400; color: #6e7681; font-size: 10px; margin-left: 4px; }
-        .p-res-val.highlight { color: #f0883e; font-size: 13px; }
-        .p-res-val.green-hi { color: #56d364; font-size: 13px; }
-
-        .p-grp { margin-top: 6px; }
-        .p-grp-head {
-            display: flex; align-items: center; gap: 4px; cursor: pointer;
-            padding: 5px 8px; border-radius: 5px; font-size: 11px; color: #8b949e;
-            user-select: none; transition: background .1s;
-        }
-        .p-grp-head:hover { background: rgba(255,255,255,.03); }
-        .p-grp-head .arr { transition: transform .15s; font-size: 9px; color: #6e7681; }
-        .p-grp.open .p-grp-head .arr { transform: rotate(90deg); }
-        .p-grp-body { display: none; padding: 2px 0 4px 18px; }
-        .p-grp.open .p-grp-body { display: block; }
-        .p-sub {
-            display: flex; justify-content: space-between; align-items: baseline;
-            padding: 3px 6px; font-size: 10.5px; color: #adb5bd;
-        }
-        .p-sub .sv { color: #c9d1d9; font-weight: 500; }
-        .p-sub .sv .ss { color: #6e7681; font-size: 9.5px; margin-left: 3px; }
-
-        .f-line { font-size: 10px; color: #8b949e; line-height: 1.65; word-break: break-all; }
-        .f-label { color: #58a6ff; font-weight: 600; }
-        .f-val { color: #c9d1d9; padding-left: 6px; }
-        .f-result { color: #7ee787; font-weight: 600; padding-left: 6px; }
-        .f-result .sub { color: #6e7681; font-weight: 400; font-size: 9px; margin-left: 3px; }
-        .f-gap { height: 6px; }
-
-        @media (max-width: 860px) {
-            .layout { grid-template-columns: 1fr; }
-            .col-left { border-right: none; border-bottom: 1px solid #1a1a1a; }
-        }
     </style>
 </head>
 <body>
@@ -214,151 +145,77 @@
             <span class="term-dot r"></span>
             <span class="term-dot y"></span>
             <span class="term-dot g"></span>
-            <span class="term-label">zsy@macbook — currency + pricing</span>
+            <span class="term-label">zsy@macbook — currency converter</span>
             <a class="back-link" href="index.html">← cd ..</a>
         </div>
 
-        <div class="layout">
-            <!-- ==================== 左侧：货币转换器 ==================== -->
-            <div class="col-left">
-                <div class="sec-h"><span class="sec-n">¥</span>货币转换器</div>
+        <div class="content">
+            <div class="sec-h"><span class="sec-n">¥</span>货币转换器</div>
 
-                <div class="error-msg" id="errorMsg"></div>
-                <div class="loading" id="loading"><span class="spinner"></span>正在获取实时汇率...</div>
+            <div class="error-msg" id="errorMsg"></div>
+            <div class="loading" id="loading"><span class="spinner"></span>正在获取实时汇率...</div>
 
-                <div class="result-banner" id="resultBanner">
-                    <div class="result-title">✅ 转换结果</div>
-                    <div class="result-source" id="resultSource"></div>
-                    <div class="result-targets" id="resultTargets"></div>
-                </div>
-
-                <div class="input-section">
-                    <div class="currency-row fixed" id="rowCNY">
-                        <div class="currency-icon icon-cny">¥</div>
-                        <div class="currency-info"><div class="currency-label">CNY</div><div class="currency-name">人民币</div></div>
-                        <div class="currency-input-wrap"><input type="number" id="inputCNY" placeholder="0.00" step="any" min="0"></div>
-                    </div>
-                    <div class="currency-row fixed" id="rowUSD">
-                        <div class="currency-icon icon-usd">$</div>
-                        <div class="currency-info"><div class="currency-label">USD</div><div class="currency-name">美元</div></div>
-                        <div class="currency-input-wrap"><input type="number" id="inputUSD" placeholder="0.00" step="any" min="0"></div>
-                    </div>
-                    <div class="currency-select-row" id="rowDynamic">
-                        <div class="currency-icon" id="dynamicIcon">฿</div>
-                        <div class="currency-info">
-                            <select class="currency-select" id="currencySelect">
-                                <option value="THB">THB · 泰铢</option>
-                                <option value="TWD">TWD · 新台币</option>
-                                <option value="RUB">RUB · 卢布</option>
-                                <option value="VND">VND · 越南盾</option>
-                            </select>
-                        </div>
-                        <div class="currency-input-wrap"><input type="number" id="inputDynamic" placeholder="0.00" step="any" min="0"></div>
-                    </div>
-                </div>
-
-                <button class="btn btn-primary" id="btnConvert">🔍 查询转换</button>
-                <button class="btn btn-secondary" id="btnClear">✕ 清空</button>
-
-                <div class="rates-section">
-                    <div class="rates-header">
-                        <div class="rates-title"><span class="live-dot"></span>实时汇率</div>
-                        <div class="update-time" id="updateTime">--</div>
-                    </div>
-                    <div class="rate-grid">
-                        <div class="rate-item">
-                            <div class="rate-pair">美元 USD <span class="rate-arrow">→</span> 人民币 CNY</div>
-                            <div class="rate-value" id="rateUSDCNY">--</div>
-                        </div>
-                        <div class="rate-item">
-                            <div class="rate-pair">美元 USD <span class="rate-arrow">→</span> <span id="rateLabelUSDX">泰铢 THB</span></div>
-                            <div class="rate-value" id="rateUSDX">--</div>
-                        </div>
-                        <div class="rate-item">
-                            <div class="rate-pair">人民币 CNY <span class="rate-arrow">→</span> <span id="rateLabelCNYX">泰铢 THB</span></div>
-                            <div class="rate-value" id="rateCNYX">--</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="footer">数据来源: open.er-api.com · 汇率仅供参考</div>
+            <div class="result-banner" id="resultBanner">
+                <div class="result-title">✅ 转换结果</div>
+                <div class="result-source" id="resultSource"></div>
+                <div class="result-targets" id="resultTargets"></div>
             </div>
 
-            <!-- ==================== 右侧：定价模拟器 ==================== -->
-            <div class="col-right">
-                <div class="sec-h"><span class="sec-n">$</span>定价模拟器</div>
-
-                <!-- 市场 -->
-                <div class="markets-row" id="markets">
-                    <div class="mkt active" data-mkt="台湾" data-rate="4.8">台湾<span class="rate">1 CNY ≈ 4.8</span></div>
-                    <div class="mkt" data-mkt="泰国" data-rate="4.95">泰国<span class="rate">1 CNY ≈ 4.95</span></div>
-                    <div class="mkt" data-mkt="越南" data-rate="3900">越南<span class="rate">1 CNY ≈ 3900</span></div>
+            <div class="input-section">
+                <div class="currency-row fixed" id="rowCNY">
+                    <div class="currency-icon icon-cny">¥</div>
+                    <div class="currency-info"><div class="currency-label">CNY</div><div class="currency-name">人民币</div></div>
+                    <div class="currency-input-wrap"><input type="number" id="inputCNY" placeholder="0.00" step="any" min="0"></div>
                 </div>
-
-                <div class="p-field p-row2" style="margin-bottom:8px;">
-                    <div><label>市场汇率</label><input id="p-rate" type="number" value="4.8" step="0.01"></div>
-                    <div><label>佣金率 (%)</label><input id="p-comm" type="number" value="14" step="0.1"></div>
+                <div class="currency-row fixed" id="rowUSD">
+                    <div class="currency-icon icon-usd">$</div>
+                    <div class="currency-info"><div class="currency-label">USD</div><div class="currency-name">美元</div></div>
+                    <div class="currency-input-wrap"><input type="number" id="inputUSD" placeholder="0.00" step="any" min="0"></div>
                 </div>
-
-                <!-- 商品信息 -->
-                <div class="p-field"><label>① 商品成本价 (CNY)</label><input id="p-cost" type="number" value="30" step="0.01"></div>
-                <div class="p-field p-row2">
-                    <div><label>② 预期净利润 (CNY)</label><input id="p-targetProfit" type="number" value="10" step="0.01"></div>
-                    <div><label>③ 折扣 (%)</label><input id="p-discount" type="number" value="0" step="1"></div>
-                </div>
-                <div class="p-field p-row2">
-                    <div><label>④ 包裹重量 (g)</label><input id="p-weight" type="number" value="200" step="1"></div>
-                    <div><label>跨境物流成本 (本地币)</label><input id="p-logi" type="number" value="25" step="0.01"></div>
-                </div>
-
-                <!-- 其他 -->
-                <div class="p-field p-row2">
-                    <div><label>境内段运费 (CNY)</label><input id="p-domesticShip" type="number" value="0" step="0.01"></div>
-                    <div><label>交易手续费率 (%)</label><input id="p-txn" type="number" value="2.5" step="0.1"></div>
-                </div>
-                <div class="p-field p-row2">
-                    <div><label>活动服务费率 (%)</label><input id="p-act" type="number" value="0" step="0.1"></div>
-                    <div><label>提现手续费率 (%)</label><input id="p-withdraw" type="number" value="0" step="0.1"></div>
-                </div>
-                <div class="p-field p-row2">
-                    <div><label>买家支付运费 (本地币)</label><input id="p-buyerShip" type="number" value="60" step="0.01"></div>
-                </div>
-
-                <!-- 结果 -->
-                <div class="p-result">
-                    <div class="p-res-list" id="p-resList"></div>
-                </div>
-
-                <!-- 平台费用 -->
-                <div class="p-grp open" id="grpPlatform">
-                    <div class="p-grp-head" onclick="toggleGrp('grpPlatform')"><span class="arr">▶</span> 平台费用</div>
-                    <div class="p-grp-body" id="p-bodyPlatform"></div>
-                </div>
-
-                <!-- 物流费用 -->
-                <div class="p-grp open" id="grpLogistics">
-                    <div class="p-grp-head" onclick="toggleGrp('grpLogistics')"><span class="arr">▶</span> 物流费用</div>
-                    <div class="p-grp-body" id="p-bodyLogistics"></div>
-                </div>
-
-                <!-- 其他费用 -->
-                <div class="p-grp open" id="grpOther">
-                    <div class="p-grp-head" onclick="toggleGrp('grpOther')"><span class="arr">▶</span> 其他费用</div>
-                    <div class="p-grp-body" id="p-bodyOther"></div>
-                </div>
-
-                <!-- 公式推导 -->
-                <div class="p-grp open" id="grpFormula">
-                    <div class="p-grp-head" onclick="toggleGrp('grpFormula')"><span class="arr">▶</span> 公式推导</div>
-                    <div class="p-grp-body" id="p-bodyFormula" style="padding: 6px 8px;"></div>
+                <div class="currency-select-row" id="rowDynamic">
+                    <div class="currency-icon" id="dynamicIcon">฿</div>
+                    <div class="currency-info">
+                        <select class="currency-select" id="currencySelect">
+                            <option value="THB">THB · 泰铢</option>
+                            <option value="TWD">TWD · 新台币</option>
+                            <option value="RUB">RUB · 卢布</option>
+                            <option value="VND">VND · 越南盾</option>
+                        </select>
+                    </div>
+                    <div class="currency-input-wrap"><input type="number" id="inputDynamic" placeholder="0.00" step="any" min="0"></div>
                 </div>
             </div>
+
+            <button class="btn btn-primary" id="btnConvert">🔍 查询转换</button>
+            <button class="btn btn-secondary" id="btnClear">✕ 清空</button>
+
+            <div class="rates-section">
+                <div class="rates-header">
+                    <div class="rates-title"><span class="live-dot"></span>实时汇率</div>
+                    <div class="update-time" id="updateTime">--</div>
+                </div>
+                <div class="rate-grid">
+                    <div class="rate-item">
+                        <div class="rate-pair">美元 USD <span class="rate-arrow">→</span> 人民币 CNY</div>
+                        <div class="rate-value" id="rateUSDCNY">--</div>
+                    </div>
+                    <div class="rate-item">
+                        <div class="rate-pair">美元 USD <span class="rate-arrow">→</span> <span id="rateLabelUSDX">泰铢 THB</span></div>
+                        <div class="rate-value" id="rateUSDX">--</div>
+                    </div>
+                    <div class="rate-item">
+                        <div class="rate-pair">人民币 CNY <span class="rate-arrow">→</span> <span id="rateLabelCNYX">泰铢 THB</span></div>
+                        <div class="rate-value" id="rateCNYX">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">数据来源: open.er-api.com · 汇率仅供参考</div>
         </div>
     </div>
 
 <script>
 (function() {
-    // ======================== 货币转换器 ========================
     var rates = { USD: 1, CNY: null, TWD: null, THB: null, RUB: null, VND: null };
     var $ = function(id) { return document.getElementById(id); };
 
@@ -444,131 +301,6 @@
     [inputCNY,inputUSD,inputDynamic].forEach(function(inp){inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();convert();}});});
     btnConvert.addEventListener('click',convert);btnClear.addEventListener('click',clearAll);
     updateDynamicUI();fetchRates();
-
-    // ======================== 定价模拟器 ========================
-    var marketRates = { 台湾: 4.8, 泰国: 4.95, 越南: 3900 };
-    var marketComm  = { 台湾: 14, 泰国: 22.47, 越南: 18 };
-    var curMkt = '台湾';
-
-    function pNum(id){ var v=parseFloat($(id).value); return isNaN(v)?0:v; }
-    function pSym(m){ if(m==='越南')return '₫'; if(m==='泰国')return '฿'; return 'TWD'; }
-    function pFmt(n,m){ if(m==='越南')return Math.round(n).toLocaleString('zh-CN'); return n.toFixed(2); }
-    function pShowVal(localVal,cnyVal,m){
-        var s=pSym(m)+pFmt(localVal,m);
-        if(cnyVal!==undefined&&cnyVal!==null)s+=' <span class="sub">≈ ¥'+cnyVal.toFixed(2)+'</span>';
-        return s;
-    }
-
-    function pRender(){
-        var rate=pNum('p-rate'),cost=pNum('p-cost'),target=pNum('p-targetProfit');
-        var disc=pNum('p-discount'),logi=pNum('p-logi'),domShip=pNum('p-domesticShip');
-        var comm=pNum('p-comm'),txn=pNum('p-txn'),act=pNum('p-act');
-        var withdr=pNum('p-withdraw'),buyerS=pNum('p-buyerShip');
-
-        var feeRate=comm/100+txn/100+act/100;
-        var denom=1-feeRate;
-        var priceAfterDisc,priceBeforeDisc;
-
-        if(denom<=0){priceAfterDisc=0;priceBeforeDisc=0;}
-        else{
-            priceAfterDisc=(target*rate+buyerS*(txn/100)+logi+cost*rate+domShip)/denom;
-            var discMul=(disc>0&&disc<100)?(1-disc/100):1;
-            priceBeforeDisc=discMul>0?priceAfterDisc/discMul:priceAfterDisc;
-        }
-
-        var costLocal=cost*rate;
-        var adjPct=0;
-        if(costLocal>0){adjPct=(priceAfterDisc*denom-logi)/costLocal*100;}
-
-        var commissionAmt=priceAfterDisc*(comm/100);
-        var txnFeeAmt=(priceAfterDisc+buyerS)*(txn/100);
-        var actFeeAmt=priceAfterDisc*(act/100);
-        var platformFee=commissionAmt+txnFeeAmt+actFeeAmt;
-        var sellerPayLogi=logi;
-        var withdrawFee=priceAfterDisc*(withdr/100);
-
-        var revenue=priceAfterDisc-platformFee-sellerPayLogi;
-        var revenueCny=revenue/rate;
-        var profitLocal=revenue-costLocal-domShip;
-        var profitCny=profitLocal/rate;
-        var profitRate=(priceAfterDisc>0)?(profitLocal/priceAfterDisc*100):0;
-
-        var pbdCny=priceBeforeDisc/rate,padCny=priceAfterDisc/rate;
-        var comCny=commissionAmt/rate,txFnCny=txnFeeAmt/rate,actFnCny=actFeeAmt/rate;
-        var slCny=sellerPayLogi/rate,bsCny=buyerS/rate,wdCny=withdrawFee/rate;
-
-        // 结果列表
-        var html='';
-        html+=pResRow('折前售价',pShowVal(priceBeforeDisc,pbdCny,curMkt),true);
-        html+=pResRow('商品售价（折后）',pShowVal(priceAfterDisc,padCny,curMkt),true,'green-hi');
-        html+=pResRow('净利润率',profitRate.toFixed(2)+'%',false,'',profitRate>=0?'#56d364':'#f0883e');
-        html+=pResRow('订单收入',pShowVal(revenue,revenueCny,curMkt));
-        html+=pResRow('站点调价比例',adjPct.toFixed(2)+'%');
-        $('p-resList').innerHTML=html;
-
-        $('p-bodyPlatform').innerHTML=pSubRow('佣金',pShowVal(commissionAmt,comCny,curMkt))+pSubRow('交易手续费',pShowVal(txnFeeAmt,txFnCny,curMkt))+pSubRow('活动服务费',pShowVal(actFeeAmt,actFnCny,curMkt));
-        $('p-bodyLogistics').innerHTML=pSubRow('跨境物流成本（藏价）',pShowVal(logi,slCny,curMkt))+pSubRow('买家支付运费',pShowVal(buyerS,bsCny,curMkt));
-        $('p-bodyOther').innerHTML=pSubRow('提现手续费',pShowVal(withdrawFee,wdCny,curMkt));
-
-        // 公式推导
-        var fHtml='';
-        fHtml+='<div class="f-line"><span class="f-label">店铺价格（折前）</span></div>';
-        fHtml+='<div class="f-line">= (成本 × 汇率 × 调价比例 + 物流成本) ÷ (1 − 佣金% − 交易手续费% − 活动服务%)</div>';
-        fHtml+='<div class="f-line f-val">= ('+cost.toFixed(2)+' × '+rate+' × '+(adjPct/100).toFixed(4)+' + '+pFmt(logi,curMkt)+') ÷ (1 − '+comm+'% − '+txn+'% − '+act+'%)</div>';
-        fHtml+='<div class="f-line f-result">= '+pFmt(priceBeforeDisc,curMkt)+' '+pSym(curMkt)+'</div>';
-        if(disc>0){
-            fHtml+='<div class="f-gap"></div><div class="f-line"><span class="f-label">折后售价</span></div>';
-            fHtml+='<div class="f-line">= 折前售价 × (1 − 折扣%)</div>';
-            fHtml+='<div class="f-line f-val">= '+pFmt(priceBeforeDisc,curMkt)+' × (1 − '+disc+'%)</div>';
-            fHtml+='<div class="f-line f-result">= '+pFmt(priceAfterDisc,curMkt)+' '+pSym(curMkt)+'</div>';
-        }
-        fHtml+='<div class="f-gap"></div><div class="f-line"><span class="f-label">平台费用</span></div>';
-        fHtml+='<div class="f-line">= 佣金 + 交易手续费 + 活动服务费</div>';
-        fHtml+='<div class="f-line f-val">= '+pFmt(commissionAmt,curMkt)+' + '+pFmt(txnFeeAmt,curMkt)+' + '+pFmt(actFeeAmt,curMkt)+'</div>';
-        fHtml+='<div class="f-line f-result">= '+pFmt(platformFee,curMkt)+' '+pSym(curMkt)+'</div>';
-        fHtml+='<div class="f-gap"></div><div class="f-line"><span class="f-label">订单收入</span></div>';
-        fHtml+='<div class="f-line">= 折后售价 − 平台费用 − 物流成本</div>';
-        fHtml+='<div class="f-line f-val">= '+pFmt(priceAfterDisc,curMkt)+' − '+pFmt(platformFee,curMkt)+' − '+pFmt(sellerPayLogi,curMkt)+'</div>';
-        fHtml+='<div class="f-line f-result">= '+pFmt(revenue,curMkt)+' '+pSym(curMkt)+'</div>';
-        fHtml+='<div class="f-gap"></div><div class="f-line"><span class="f-label">净利润</span></div>';
-        fHtml+='<div class="f-line">= 订单收入 − 成本(本地币) − 境内段运费</div>';
-        fHtml+='<div class="f-line f-val">= '+pFmt(revenue,curMkt)+' − '+pFmt(costLocal,curMkt)+' − '+domShip.toFixed(2)+'</div>';
-        fHtml+='<div class="f-line f-result">= '+pFmt(profitLocal,curMkt)+' '+pSym(curMkt)+' <span class="sub">≈ ¥'+profitCny.toFixed(2)+'</span></div>';
-        fHtml+='<div class="f-gap"></div><div class="f-line"><span class="f-label">净利润率</span></div>';
-        fHtml+='<div class="f-line">= 净利润 ÷ 折后售价 × 100%</div>';
-        fHtml+='<div class="f-line f-val">= '+pFmt(profitLocal,curMkt)+' ÷ '+pFmt(priceAfterDisc,curMkt)+' × 100%</div>';
-        fHtml+='<div class="f-line f-result">= '+profitRate.toFixed(2)+'%</div>';
-        fHtml+='<div class="f-gap"></div><div class="f-line"><span class="f-label">站点调价比例（反推）</span></div>';
-        fHtml+='<div class="f-line">= (折后售价 × (1−佣金%−交易手续费%−活动服务%) − 物流成本) ÷ (成本 × 汇率) × 100%</div>';
-        fHtml+='<div class="f-line f-val">= ('+pFmt(priceAfterDisc,curMkt)+' × '+denom.toFixed(4)+' − '+pFmt(logi,curMkt)+') ÷ ('+cost.toFixed(2)+' × '+rate+') × 100%</div>';
-        fHtml+='<div class="f-line f-result">= '+adjPct.toFixed(2)+'%</div>';
-        $('p-bodyFormula').innerHTML=fHtml;
-    }
-
-    function pResRow(label,val,isPrice,cls,color){
-        var c=color||'';
-        var extra=isPrice?'<span class="tag">本地币</span>':'';
-        return '<div class="p-res-item"><span class="p-res-label">'+extra+label+'</span><span class="p-res-val'+(cls?' '+cls:'')+'"'+(c?' style="color:'+c+'"':'')+'>'+val+'</span></div>';
-    }
-    function pSubRow(label,val){return '<div class="p-sub"><span>'+label+'</span><span class="sv">'+val+'</span></div>';}
-
-    function pSelectMkt(m){
-        curMkt=m;
-        $('p-rate').value=marketRates[m];
-        $('p-comm').value=marketComm[m];
-        Array.prototype.forEach.call($('markets').querySelectorAll('.mkt'),function(el){el.classList.toggle('active',el.getAttribute('data-mkt')===m);});
-        pRender();
-    }
-
-    window.toggleGrp=function(id){$(id).classList.toggle('open');};
-
-    ['p-cost','p-targetProfit','p-discount','p-weight','p-logi','p-domesticShip','p-comm','p-txn','p-act','p-withdraw','p-buyerShip','p-rate'].forEach(function(id){
-        $(id).addEventListener('input',pRender);
-    });
-    Array.prototype.forEach.call($('markets').querySelectorAll('.mkt'),function(el){
-        el.addEventListener('click',function(){pSelectMkt(el.getAttribute('data-mkt'));});
-    });
-    pRender();
 })();
 </script>
 </body>

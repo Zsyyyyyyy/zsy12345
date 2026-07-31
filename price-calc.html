@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>定价模拟器</title>
+<style>
+    *, *::before, *::after {
+      font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background: #0d0d0d;
+        color: #e6e6e6;
+        min-height: 100vh;
+        padding: 20px 12px;
+    }
+    .term {
+        max-width: 960px;
+        margin: 0 auto;
+        background: #111;
+        border: 1px solid #222;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+    .term-bar {
+        background: #161616;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        border-bottom: 1px solid #222;
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+    .dot.r { background: #ff5f56; }
+    .dot.y { background: #ffbd2e; }
+    .dot.g { background: #27c93f; }
+    .term-title { margin-left: 6px; font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .back-link {
+        margin-left: auto; flex-shrink: 0;
+        font-size: 12px; color: #58a6ff; text-decoration: none;
+        border: 1px solid #2a3a4a; padding: 3px 9px; border-radius: 5px; transition: all .15s;
+    }
+    .back-link:hover { background: #16202c; }
+
+    /* ===== 两栏布局 ===== */
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+
+    /* ===== 左侧输入 ===== */
+    .left { padding: 18px 18px 18px; border-right: 1px solid #1a1a1a; }
+    .right { padding: 18px 18px 18px; background: #0e0e0e; }
+
+    .sec-title {
+        font-size: 13px; font-weight: 600; color: #f0883e; margin-bottom: 12px;
+        display: flex; align-items: center; gap: 7px;
+    }
+    .sec-num {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 19px; height: 19px; border-radius: 50%;
+        background: #f0883e; color: #000; font-size: 11px; font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .field { margin-bottom: 10px; }
+    .field label {
+        display: block; font-size: 11.5px; color: #adb5bd; margin-bottom: 4px;
+    }
+    .field input, .field select {
+        width: 100%; padding: 7px 9px;
+        background: #0b0b0b; border: 1px solid #2a2a2a; border-radius: 6px;
+        color: #e6e6e6; font-size: 13px; outline: none; transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus { border-color: #58a6ff; }
+    .field select option { background: #1a1a1a; color: #e6e6e6; }
+
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row2 .field { margin-bottom: 0; }
+
+    .markets-row {
+        display: flex; gap: 6px; margin-bottom: 14px;
+    }
+    .mkt {
+        flex: 1; text-align: center; padding: 8px 3px;
+        background: #0b0b0b; border: 1px solid #2a2a2a; border-radius: 7px;
+        cursor: pointer; font-size: 13px; color: #adb5bd; transition: all .15s;
+    }
+    .mkt .rate { display: block; font-size: 10.5px; color: #6e7681; margin-top: 2px; }
+    .mkt:hover { border-color: #3a3a3a; }
+    .mkt.active { background: #11202c; border-color: #58a6ff; color: #7ee787; }
+    .mkt.active .rate { color: #58a6ff; }
+
+    .info-line {
+        font-size: 11px; color: #6e7681; margin-bottom: 12px; line-height: 1.5;
+    }
+    .info-line b { color: #79c0ff; }
+
+    .calc-btn {
+        width: 100%; padding: 9px; margin-top: 4px;
+        background: linear-gradient(135deg,#da3633,#cf222e); color: #fff;
+        border: none; border-radius: 7px; font-size: 13px; font-weight: 700;
+        cursor: pointer; transition: opacity .15s;
+    }
+    .calc-btn:hover { opacity: .88; }
+
+    /* ===== 右侧结果 ===== */
+    .res-item {
+        display: flex; justify-content: space-between; align-items: baseline;
+        padding: 8px 10px; border-radius: 7px; margin-bottom: 5px;
+        font-size: 12.5px; transition: background .1s;
+    }
+    .res-item:nth-child(odd) { background: rgba(255,255,255,.02); }
+    .res-label { color: #adb5bd; display: flex; align-items: center; gap: 5px; }
+    .res-label .tag {
+        font-size: 9.5px; padding: 1px 5px; border-radius: 3px; background: #1a2332; color: #58a6ff;
+    }
+    .res-val { color: #7ee787; font-weight: 600; text-align: right; }
+    .res-val .sub { font-weight: 400; color: #6e7681; font-size: 11px; margin-left: 5px; }
+    .res-val.highlight { color: #f0883e; font-size: 14px; }
+    .res-val.green-hi { color: #56d364; font-size: 14px; }
+
+    /* 可折叠组 */
+    .grp { margin-top: 8px; }
+    .grp-head {
+        display: flex; align-items: center; gap: 5px; cursor: pointer;
+        padding: 7px 10px; border-radius: 6px; transition: background .1s;
+        font-size: 12px; color: #8b949e; user-select: none;
+    }
+    .grp-head:hover { background: rgba(255,255,255,.03); }
+    .grp-head .arr { transition: transform .15s; font-size: 10px; color: #6e7681; }
+    .grp.open .grp-head .arr { transform: rotate(90deg); }
+    .grp-body { display: none; padding: 4px 0 6px 22px; }
+    .grp.open .grp-body { display: block; }
+    .sub-item {
+        display: flex; justify-content: space-between; align-items: baseline;
+        padding: 5px 8px; font-size: 11.5px; color: #adb5bd;
+    }
+    .sub-item .sv { color: #c9d1d9; font-weight: 500; }
+    .sub-item .sv .ss { color: #6e7681; font-size: 10.5px; margin-left: 4px; }
+
+    .note {
+        margin-top: 14px; padding: 10px 12px; border-radius: 7px;
+        background: rgba(248,81,73,.06); border: 1px solid rgba(248,81,73,.15);
+        font-size: 10.5px; color: #8b949e; line-height: 1.65;
+    }
+    .note li { margin-bottom: 3px; list-style-position: inside; }
+
+    /* 公式推导 */
+    .f-line { font-size: 11px; color: #8b949e; line-height: 1.7; word-break: break-all; }
+    .f-label { color: #58a6ff; font-weight: 600; }
+    .f-val { color: #c9d1d9; padding-left: 8px; }
+    .f-result { color: #7ee787; font-weight: 600; padding-left: 8px; }
+    .f-result .sub { color: #6e7681; font-weight: 400; font-size: 10px; margin-left: 4px; }
+    .f-gap { height: 8px; }
+
+    @media (max-width: 720px) {
+        .layout { grid-template-columns: 1fr; }
+        .left { border-right: none; border-bottom: 1px solid #1a1a1a; }
+    }
+</style>
+</head>
+<body>
+<div class="term">
+    <div class="term-bar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="term-title">zsy@macbook:~/tools$ ./price-sim</span>
+        <a class="back-link" href="index.html">← cd ..</a>
+    </div>
+
+    <div class="layout">
+        <!-- ========== 左侧输入 ========== -->
+        <div class="left">
+
+            <!-- 市场 -->
+            <div class="sec-title"><span class="sec-num">1</span>站点与汇率</div>
+            <div class="markets-row" id="markets">
+                <div class="mkt active" data-mkt="台湾" data-rate="4.8">台湾<span class="rate">1 CNY ≈ 4.8 TWD</span></div>
+                <div class="mkt" data-mkt="泰国" data-rate="4.95">泰国<span class="rate">1 CNY ≈ 4.95 ฿</span></div>
+                <div class="mkt" data-mkt="越南" data-rate="3900">越南<span class="rate">1 CNY ≈ 3900 ₫</span></div>
+            </div>
+            <div class="field row2" style="margin-bottom:14px;">
+                <div><label>市场汇率</label><input id="rate" type="number" value="4.8" step="0.01"></div>
+                <div><label>佣金率 (%)</label><input id="comm" type="number" value="14" step="0.1"></div>
+            </div>
+
+            <!-- 商品信息 -->
+            <div class="sec-title"><span class="sec-num">2</span>输入商品信息</div>
+            <div class="field">
+                <label>① 商品成本价 (CNY)</label>
+                <input id="cost" type="number" value="30" step="0.01" autofocus>
+            </div>
+            <div class="field row2">
+                <div><label>② 预期净利润 (CNY)</label><input id="targetProfit" type="number" value="10" step="0.01"></div>
+                <div><label>③ 折扣 (%)</label><input id="discount" type="number" value="0" step="1"></div>
+            </div>
+            <div class="field row2">
+                <div><label>④ 包裹重量 (g)</label><input id="weight" type="number" value="200" step="1"></div>
+            </div>
+
+            <!-- 其他信息 -->
+            <div class="sec-title"><span class="sec-num">3</span>其他费用</div>
+            <div class="field row2">
+                <div><label>跨境物流成本 (本地币)</label><input id="logi" type="number" value="25" step="0.01"></div>
+                <div><label>境内段运费 (CNY)</label><input id="domesticShip" type="number" value="0" step="0.01"></div>
+            </div>
+            <div class="field row2">
+                <div><label>交易手续费率 (%)</label><input id="txn" type="number" value="2.5" step="0.1"></div>
+                <div><label>活动服务费率 (%)</label><input id="act" type="number" value="0" step="0.1"></div>
+            </div>
+            <div class="field row2">
+                <div><label>提现手续费率 (%)</label><input id="withdraw" type="number" value="0" step="0.1"></div>
+                <div><label>买家支付运费 (本地币)</label><input id="buyerShip" type="number" value="60" step="0.01"></div>
+            </div>
+
+            <button class="calc-btn" onclick="render()">⚡ 计算</button>
+        </div>
+
+        <!-- ========== 右侧结果 ========== -->
+        <div class="right">
+            <div class="sec-title" style="margin-bottom:10px;">计算结果 · <span id="curMkt" style="color:#7ee787;font-weight:400;">台湾</span></div>
+
+            <div class="res-list" id="resList">
+                <!-- 动态填充 -->
+            </div>
+
+            <!-- 平台费用 -->
+            <div class="grp open" id="grpPlatform">
+                <div class="grp-head" onclick="toggleGrp('grpPlatform')"><span class="arr">▶</span> 平台费用</div>
+                <div class="grp-body" id="bodyPlatform"></div>
+            </div>
+
+            <!-- 物流费用 -->
+            <div class="grp open" id="grpLogistics">
+                <div class="grp-head" onclick="toggleGrp('grpLogistics')"><span class="arr">▶</span> 物流费用</div>
+                <div class="grp-body" id="bodyLogistics"></div>
+            </div>
+
+            <!-- 其他费用 -->
+            <div class="grp open" id="grpOther">
+                <div class="grp-head" onclick="toggleGrp('grpOther')"><span class="arr">▶</span> 其他费用</div>
+                <div class="grp-body" id="bodyOther"></div>
+            </div>
+
+            <!-- 公式推导 -->
+            <div class="grp open" id="grpFormula">
+                <div class="grp-head" onclick="toggleGrp('grpFormula')"><span class="arr">▶</span> 公式推导</div>
+                <div class="grp-body" id="bodyFormula" style="padding: 8px 10px;"></div>
+            </div>
+
+            <div class="note">
+                <ul>
+                    <li>计算结果为模拟效果，仅供参考。定价需结合实际运营情况调整。</li>
+                    <li>各站点费率可能变动，请以平台最新公告为准。</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var marketRates = { 台湾: 4.8, 泰国: 4.95, 越南: 3900 };
+    var marketComm  = { 台湾: 14, 泰国: 22.47, 越南: 18 };
+    var curMkt = '台湾';
+
+    var $ = function(id){ return document.getElementById(id); };
+    function num(id){
+        var v = parseFloat($(id).value);
+        return isNaN(v) ? 0 : v;
+    }
+    function sym(m){
+        if(m === '越南') return '₫';
+        if(m === '泰国') return '฿';
+        return 'TWD';
+    }
+    // 格式化：越南取整，其余两位小数
+    function fmt(n, m){
+        if(m === '越南') return Math.round(n).toLocaleString('zh-CN');
+        return n.toFixed(2);
+    }
+    // 显示值 + CNY 换算
+    function showVal(localVal, cnyVal, m){
+        var s = sym(m) + fmt(localVal, m);
+        if(cnyVal !== undefined && cnyVal !== null) s += ' <span class="sub">≈ ¥' + cnyVal.toFixed(2) + '</span>';
+        return s;
+    }
+
+    function toggleGrp(id){
+        $(id).classList.toggle('open');
+    }
+
+    function render(){
+        var rate   = num('rate');
+        var cost   = num('cost');           // 商品成本价 CNY
+        var target = num('targetProfit');   // 预期净利润 CNY
+        var disc   = num('discount');       // 折扣 %
+        var weight = num('weight');          // 包裹重量 g
+        var logi   = num('logi');           // 跨境物流成本 本地币
+        var domShip= num('domesticShip');   // 境内段运费 CNY
+        var comm   = num('comm');           // 佣金 %
+        var txn    = num('txn');            // 交易手续费 %
+        var act    = num('act');            // 活动服务费 %
+        var withdr = num('withdraw');       // 提现手续费 %
+        var buyerS = num('buyerShip');      // 买家支付运费 本地币
+
+        // ---- 核心公式：从目标净利润反推售价 ----
+        // 净利润 = 订单收入 - 成本×汇率 - 境内段运费
+        // 订单收入 = 折后售价 - 平台费用 - 跨境物流成本
+        // 平台费用 = 佣金 + 交易手续费 + 活动服务费
+        // 交易手续费 = (折后售价 + 买家支付运费) × 交易手续费率
+        // 展开后：
+        // 折后售价 = (目标净利润×汇率 + 买家支付运费×交易手续费率 + 跨境物流成本 + 成本×汇率 + 境内段运费) / (1 - 佣金% - 交易手续费% - 活动服务%)
+
+        var feeRate = comm/100 + txn/100 + act/100;
+        var denom = 1 - feeRate;
+
+        var priceAfterDisc, priceBeforeDisc;
+        var err = '';
+
+        if(denom <= 0){
+            err = '分母 ≤ 0（费率合计超过 100%）';
+            priceAfterDisc = 0; priceBeforeDisc = 0;
+        } else {
+            priceAfterDisc = (target * rate + buyerS * (txn/100) + logi + cost * rate + domShip) / denom;
+            // 折前售价 = 折后售价 / (1 - 折扣%)
+            var discMul = (disc > 0 && disc < 100) ? (1 - disc/100) : 1;
+            priceBeforeDisc = discMul > 0 ? priceAfterDisc / discMul : priceAfterDisc;
+        }
+
+        // ---- 推导站点调价比例 ----
+        // 原公式: 折后售价 × (1-佣金%-交易手续费%-活动服务%) = 成本×汇率×调价比例 + 跨境物流成本
+        // 反推: 调价比例 = (折后售价 × (1-feeRate) - 跨境物流成本) / (成本 × 汇率)
+        var costLocal = cost * rate;  // 成本转本地币
+        var adjPct = 0;
+        if(costLocal > 0){
+            adjPct = (priceAfterDisc * denom - logi) / costLocal * 100;
+        }
+
+        // ---- 各项费用明细 ----
+        var commissionAmt = priceAfterDisc * (comm/100);              // 佣金
+        var txnFeeAmt     = (priceAfterDisc + buyerS) * (txn/100);   // 交易手续费(含买家运费)
+        var actFeeAmt     = priceAfterDisc * (act/100);              // 活动服务费
+        var platformFee   = commissionAmt + txnFeeAmt + actFeeAmt;    // 平台总费用
+
+        var sellerPayLogi = logi;                                     // 卖家付物流 = 跨境物流成本
+        var withdrawFee   = priceAfterDisc * (withdr/100);           // 提现手续费
+
+        // ---- 收入 & 利润 ----
+        var revenue = priceAfterDisc - platformFee - sellerPayLogi;   // 订单收入
+        var revenueCny = revenue / rate;
+        var profitLocal = revenue - costLocal - domShip;              // 净利润(本地币)
+        var profitCny   = profitLocal / rate;
+        var profitRate  = (priceAfterDisc > 0) ? (profitLocal / priceAfterDisc * 100) : 0;
+
+        // ---- CNY 换算 ----
+        var pbdCny = priceBeforeDisc / rate;
+        var padCny = priceAfterDisc / rate;
+        var comCny = commissionAmt / rate;
+        var txFnCny = txnFeeAmt / rate;
+        var actFnCny = actFeeAmt / rate;
+        var slCny = sellerPayLogi / rate;
+        var bsCny = buyerS / rate;
+        var wdCny = withdrawFee / rate;
+
+        $('curMkt').textContent = curMkt;
+
+        // ---- 渲染结果列表 ----
+        var html = '';
+        html += resRow('折前售价', showVal(priceBeforeDisc, pbdCny, curMkt), true);
+        html += resRow('商品售价（折后）', showVal(priceAfterDisc, padCny, curMkt), true, 'green-hi');
+        html += resRow('净利润率', profitRate.toFixed(2) + '%', false, '', profitRate >= 0 ? '#56d364' : '#f0883e');
+        html += resRow('订单收入', showVal(revenue, revenueCny, curMkt));
+        html += resRow('站点调价比例', adjPct.toFixed(2) + '%');
+
+        $('resList').innerHTML = html;
+
+        // ---- 平台费用明细 ----
+        $('bodyPlatform').innerHTML =
+            subRow('佣金', showVal(commissionAmt, comCny, curMkt)) +
+            subRow('交易手续费', showVal(txnFeeAmt, txFnCny, curMkt)) +
+            subRow('活动服务费', showVal(actFeeAmt, actFnCny, curMkt));
+
+        // ---- 物流费用明细 ----
+        $('bodyLogistics').innerHTML =
+            subRow('跨境物流成本（藏价）', showVal(logi, slCny, curMkt)) +
+            subRow('买家支付运费', showVal(buyerS, bsCny, curMkt));
+
+        // ---- 其他费用明细 ----
+        $('bodyOther').innerHTML =
+            subRow('提现手续费', showVal(withdrawFee, wdCny, curMkt));
+
+        // ---- 公式推导（代入实际值） ----
+        var fHtml = '';
+        fHtml += '<div class="f-line"><span class="f-label">店铺价格（折前）</span></div>';
+        fHtml += '<div class="f-line">= (成本 × 汇率 × 调价比例 + 物流成本) ÷ (1 − 佣金% − 交易手续费% − 活动服务%)</div>';
+        fHtml += '<div class="f-line f-val">= (' + cost.toFixed(2) + ' × ' + rate + ' × ' + (adjPct/100).toFixed(4) + ' + ' + fmt(logi,curMkt) + ') ÷ (1 − ' + comm + '% − ' + txn + '% − ' + act + '%)</div>';
+        fHtml += '<div class="f-line f-result">= ' + fmt(priceBeforeDisc, curMkt) + ' ' + sym(curMkt) + '</div>';
+
+        if(disc > 0){
+            fHtml += '<div class="f-gap"></div>';
+            fHtml += '<div class="f-line"><span class="f-label">折后售价</span></div>';
+            fHtml += '<div class="f-line">= 折前售价 × (1 − 折扣%)</div>';
+            fHtml += '<div class="f-line f-val">= ' + fmt(priceBeforeDisc,curMkt) + ' × (1 − ' + disc + '%)</div>';
+            fHtml += '<div class="f-line f-result">= ' + fmt(priceAfterDisc, curMkt) + ' ' + sym(curMkt) + '</div>';
+        }
+
+        fHtml += '<div class="f-gap"></div>';
+        fHtml += '<div class="f-line"><span class="f-label">平台费用</span></div>';
+        fHtml += '<div class="f-line">= 佣金 + 交易手续费 + 活动服务费</div>';
+        fHtml += '<div class="f-line f-val">= ' + fmt(commissionAmt,curMkt) + ' + ' + fmt(txnFeeAmt,curMkt) + ' + ' + fmt(actFeeAmt,curMkt) + '</div>';
+        fHtml += '<div class="f-line f-result">= ' + fmt(platformFee, curMkt) + ' ' + sym(curMkt) + '</div>';
+
+        fHtml += '<div class="f-gap"></div>';
+        fHtml += '<div class="f-line"><span class="f-label">订单收入</span></div>';
+        fHtml += '<div class="f-line">= 折后售价 − 平台费用 − 物流成本</div>';
+        fHtml += '<div class="f-line f-val">= ' + fmt(priceAfterDisc,curMkt) + ' − ' + fmt(platformFee,curMkt) + ' − ' + fmt(sellerPayLogi,curMkt) + '</div>';
+        fHtml += '<div class="f-line f-result">= ' + fmt(revenue, curMkt) + ' ' + sym(curMkt) + '</div>';
+
+        fHtml += '<div class="f-gap"></div>';
+        fHtml += '<div class="f-line"><span class="f-label">净利润</span></div>';
+        fHtml += '<div class="f-line">= 订单收入 − 成本(本地币) − 境内段运费</div>';
+        fHtml += '<div class="f-line f-val">= ' + fmt(revenue,curMkt) + ' − ' + fmt(costLocal,curMkt) + ' − ' + domShip.toFixed(2) + '</div>';
+        fHtml += '<div class="f-line f-result">= ' + fmt(profitLocal, curMkt) + ' ' + sym(curMkt) + ' <span class="sub">≈ ¥' + profitCny.toFixed(2) + '</span></div>';
+
+        fHtml += '<div class="f-gap"></div>';
+        fHtml += '<div class="f-line"><span class="f-label">净利润率</span></div>';
+        fHtml += '<div class="f-line">= 净利润 ÷ 折后售价 × 100%</div>';
+        fHtml += '<div class="f-line f-val">= ' + fmt(profitLocal,curMkt) + ' ÷ ' + fmt(priceAfterDisc,curMkt) + ' × 100%</div>';
+        fHtml += '<div class="f-line f-result">= ' + profitRate.toFixed(2) + '%</div>';
+
+        fHtml += '<div class="f-gap"></div>';
+        fHtml += '<div class="f-line"><span class="f-label">站点调价比例（反推）</span></div>';
+        fHtml += '<div class="f-line">= (折后售价 × (1−佣金%−交易手续费%−活动服务%) − 物流成本) ÷ (成本 × 汇率) × 100%</div>';
+        fHtml += '<div class="f-line f-val">= (' + fmt(priceAfterDisc,curMkt) + ' × ' + denom.toFixed(4) + ' − ' + fmt(logi,curMkt) + ') ÷ (' + cost.toFixed(2) + ' × ' + rate + ') × 100%</div>';
+        fHtml += '<div class="f-line f-result">= ' + adjPct.toFixed(2) + '%</div>';
+
+        $('bodyFormula').innerHTML = fHtml;
+    }
+
+    function resRow(label, val, isPrice, cls, color){
+        var c = color || '';
+        var extra = isPrice ? '<span class="tag">本地币</span>' : '';
+        return '<div class="res-item">' +
+            '<span class="res-label">' + extra + label + '</span>' +
+            '<span class="res-val' + (cls?' '+cls:'') + '"'+(c?' style="color:'+c+'"':'')+'>' + val + '</span></div>';
+    }
+
+    function subRow(label, val){
+        return '<div class="sub-item"><span>'+label+'</span><span class="sv">'+val+'</span></div>';
+    }
+
+    function selectMkt(m){
+        curMkt = m;
+        $('rate').value = marketRates[m];
+        $('comm').value = marketComm[m];
+        Array.prototype.forEach.call($('markets').querySelectorAll('.mkt'), function(el){
+            el.classList.toggle('active', el.getAttribute('data-mkt') === m);
+        });
+        render();
+    }
+
+    // 绑定事件
+    ['cost','targetProfit','discount','weight','logi','domesticShip','comm','txn','act','withdraw','buyerShip','rate'].forEach(function(id){
+        $(id).addEventListener('input', render);
+    });
+
+    Array.prototype.forEach.call($('markets').querySelectorAll('.mkt'), function(el){
+        el.addEventListener('click', function(){
+            selectMkt(el.getAttribute('data-mkt'));
+        });
+    });
+
+    render();
+</script>
+</body>
+</html>

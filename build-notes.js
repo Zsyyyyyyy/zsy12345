@@ -51,3 +51,17 @@ const js = '// 本文件由 build-notes.js 自动生成，请勿手动修改\n' 
 fs.writeFileSync(OUT_FILE, js, 'utf8');
 console.log('已生成 notes-data.js，共 ' + data.length + ' 篇笔记');
 data.forEach(n => console.log('  [' + n.region + '] ' + n.title + '  (' + n.file + ')'));
+
+// 防止浏览器/静态托管缓存旧数据：每次构建给 notes.html 里的引用打上版本号
+const HTML_FILE = path.join(ROOT, 'notes.html');
+if (fs.existsSync(HTML_FILE)) {
+  const ts = Date.now();
+  let h = fs.readFileSync(HTML_FILE, 'utf8');
+  const before = h;
+  h = h.replace(/<script src="notes-data\.js(\?v=\d+)?"><\/script>/,
+                '<script src="notes-data.js?v=' + ts + '"></script>');
+  if (h !== before) {
+    fs.writeFileSync(HTML_FILE, h, 'utf8');
+    console.log('已更新 notes.html 的 notes-data.js 引用版本号（防缓存）');
+  }
+}

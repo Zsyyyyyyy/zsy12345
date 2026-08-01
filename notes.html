@@ -136,6 +136,27 @@
         .post-meta .sep { color: #2a2a2a; }
         .post-meta .fname { color: #3f3f3f; }
 
+        /* 阅读视图操作按钮（复制） */
+        .post-head-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .copy-btn {
+            padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit;
+            background: rgba(88,166,255,0.12); color: var(--accent);
+            border: 1px solid rgba(88,166,255,0.3); border-radius: 6px;
+            transition: all .15s; white-space: nowrap;
+        }
+        .copy-btn:hover { background: rgba(88,166,255,0.22); color: var(--accent-hover); }
+        .copy-btn:active { transform: translateY(1px); }
+
+        /* 复制提示 toast */
+        .toast {
+            position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%) translateY(16px);
+            background: #1a1a1a; border: 1px solid #333; color: #d4d4d4;
+            padding: 10px 18px; border-radius: 8px; font-size: 13px;
+            opacity: 0; pointer-events: none; transition: all .22s; z-index: 600;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.ok { border-color: rgba(63,185,80,0.5); color: #7ee787; }
+
         /* Markdown body */
         .md-body { font-size: 15px; line-height: 1.85; color: #c4c4c4; word-break: break-word; }
         .md-body > *:first-child { margin-top: 0; }
@@ -221,6 +242,8 @@
             .thread-num, .thread-side { display: none; }
             .post-title { font-size: 20px; }
             .md-body { font-size: 14px; }
+            .post-head { flex-wrap: wrap; }
+            .post-head-right { margin-top: 8px; }
         }
     </style>
 </head>
@@ -257,7 +280,11 @@
                 <a class="back-link" onclick="backToList()">← 返回列表</a>
                 <div class="post-head">
                     <h2 class="post-title" id="postTitle"></h2>
-                    <span class="region-badge" id="postBadge"></span>
+                    <div class="post-head-right">
+                        <span class="region-badge" id="postBadge"></span>
+                        <button class="copy-btn" onclick="copyMd()">复制源码</button>
+                        <button class="copy-btn" onclick="copyText()">复制文本</button>
+                    </div>
                 </div>
                 <div class="post-meta" id="postMeta"></div>
                 <div class="md-body" id="postContent"></div>
@@ -265,6 +292,9 @@
         </div>
     </div>
 </div>
+
+<!-- Copy toast -->
+<div class="toast" id="toast"></div>
 
 <!-- Lock overlay -->
 <div class="lock-overlay" id="lockOverlay">
@@ -429,6 +459,48 @@
         $('readView').style.display = 'none';
         $('listView').style.display = 'block';
         renderList();
+    };
+
+    /* ===== 复制 ===== */
+    var toastTimer;
+    function toast(msg, ok) {
+        var t = $('toast');
+        t.textContent = msg;
+        t.className = 'show' + (ok ? ' ok' : '');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function(){ t.className = ''; }, 1700);
+    }
+    function fallbackCopy(text, okMsg) {
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            var ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            toast(ok ? okMsg : '复制失败，请手动选择', ok);
+        } catch (e) {
+            toast('复制失败，请手动选择文字', false);
+        }
+    }
+    function copyToClipboard(text, okMsg) {
+        if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function(){ toast(okMsg, true); })
+                .catch(function(){ fallbackCopy(text, okMsg); });
+        } else {
+            fallbackCopy(text, okMsg);
+        }
+    }
+    window.copyMd = function() {
+        var n = notes[readingIndex];
+        if (!n) { toast('没有可复制的内容', false); return; }
+        copyToClipboard(n.content || '', '已复制 Markdown 源码');
+    };
+    window.copyText = function() {
+        var el = $('postContent');
+        var txt = (el.innerText || el.textContent || '').trim();
+        if (!txt) { toast('没有可复制的内容', false); return; }
+        copyToClipboard(txt, '已复制纯文本');
     };
 
     var searchTimer;

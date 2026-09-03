@@ -60,6 +60,31 @@ class PositionOut(BaseModel):
         from_attributes = True
 
 
+# ===== 结算 =====
+class SettlementCreate(BaseModel):
+    """结算持仓：只需结算价，其余字段（名称/币种/乘数）可选，后端会从持仓快照兜底"""
+    settle_price: float
+    name: Optional[str] = None
+    currency: Optional[str] = None
+    multiplier: Optional[float] = None
+
+
+class SettlementOut(BaseModel):
+    id: int
+    code: str
+    name: Optional[str]
+    buy_price: float
+    settle_price: float
+    lots: float
+    multiplier: Optional[float]
+    pnl: float
+    currency: str
+    settled_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ===== 看盘分组 =====
 class WatchGroupCreate(BaseModel):
     """新增看盘分组"""

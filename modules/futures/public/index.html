@@ -3,7 +3,7 @@
 <head data-page-node-id="omtuxq3h1agnl2IDyahGwU">
 <meta charset="UTF-8" data-page-node-id="pRDMUvvgaBRGBvq8DL0rz2">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="lI5PnXLRTS2NS46eYXUOVD">
-<title>看板 · 网页版</title>
+<title>看板</title>
 <style>
   :root {
     --bg: #0d0d0d;
@@ -131,6 +131,32 @@
   tr:hover .op { visibility: visible; }
   .op:hover { color: var(--accent); }
   .op.del:hover { color: var(--up); }
+  .op.settle:hover { color: var(--down); }
+  /* 持仓品种标记：看盘清单里标出「我的」中持有的品种 */
+  tr.has-pos td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+  .pos-tag {
+    display: inline-block; margin-left: 5px; padding: 0 4px;
+    font-size: 10px; line-height: 13px; vertical-align: 1px;
+    border: 1px solid var(--accent); color: var(--accent); border-radius: 3px;
+  }
+  /* 结算弹窗 */
+  .settle-info { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 8px; }
+  .settle-info b { color: var(--text); font-weight: 500; }
+  .settle-form { display: flex; flex-direction: column; gap: 10px; }
+  .settle-form label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .settle-form label span { width: 84px; text-align: right; flex-shrink: 0; }
+  .settle-form input { flex: 1; width: auto; }
+  .settle-form .row-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .settle-form .row-btns .primary { color: var(--down); border-color: var(--down); }
+  .settle-form .msg { color: var(--up); font-size: 11px; min-height: 14px; }
+  /* 添加确认弹窗：确认按钮用 accent 色，与结算的绿色区分 */
+  #addConfirm.primary { color: var(--accent); border-color: var(--accent); }
+  #addConfirm.primary:disabled { color: var(--muted); border-color: var(--border); cursor: not-allowed; }
+  .add-info .loading { color: var(--muted); }
+  /* 结算历史列表 */
+  .settle-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .settle-table th { color: var(--muted); text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+  .settle-table td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
   footer { color: var(--muted); font-size: 11px; margin-top: 8px; }
   .pos-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 3px; border-bottom: 1px solid var(--border); margin-bottom: 5px; }
   .pos-head h2 { border-bottom: none; margin: 0; padding: 0; }
@@ -227,7 +253,7 @@
     <aside id="positions"></aside>
   </div>
 
-  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：新浪财经 · 涨红跌绿 · 国内期货可点名称看分时图</footer>
+  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：新浪财经 · 涨红跌绿 · 国内期货可点名称看分时图 · 带 <span class="pos-tag" style="margin:0 2px">持</span> 标记且左侧有色条的行 = 你已持仓（悬浮看买入价与手数）</footer>
   </div>
 </div>
 
@@ -266,6 +292,61 @@
     </div>
   </div>
 
+  <div class="mask" id="settleMask">
+    <div class="modal narrow">
+      <div class="modal-head">
+        <span class="t" id="settleTitle">结算持仓</span>
+        <span class="sp"></span>
+        <button class="close-btn" id="settleClose">×</button>
+      </div>
+      <div class="settle-info" id="settleInfo"></div>
+      <div class="settle-form">
+        <label><span>结算价</span><input id="settlePrice" type="number" step="any" placeholder="平仓价格"></label>
+        <div class="row-btns">
+          <button id="settleCancel">取消</button>
+          <button id="settleSave" class="primary">结算</button>
+        </div>
+        <div class="msg" id="settleMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mask" id="addMask">
+    <div class="modal narrow">
+      <div class="modal-head">
+        <span class="t">添加品种</span>
+        <span class="sp"></span>
+        <button class="close-btn" id="addClose">×</button>
+      </div>
+      <div class="add-info settle-info" id="addInfo"></div>
+      <div class="settle-form">
+        <label><span>归入分组</span><select id="addGroupSel">
+          <option value="国内商品期货">国内商品期货</option>
+          <option value="海外期货">海外期货</option>
+          <option value="指数">指数</option>
+          <option value="股票">股票</option>
+        </select></label>
+        <div class="row-btns">
+          <button id="addCancel">取消</button>
+          <button id="addConfirm" class="primary">确认添加</button>
+        </div>
+        <div class="msg" id="addMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mask" id="historyMask">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="t">结算记录</span>
+        <span class="sub" id="historySub"></span>
+        <span class="sp"></span>
+        <button class="close-btn" id="historyClose">×</button>
+      </div>
+      <div id="historyBody" style="max-height:60vh;overflow:auto;"></div>
+    </div>
+  </div>
+
   <button id="themeToggle" title="一键切换彩色/灰度（黑白）显示"><span class="ico" id="themeIco">●</span><span id="themeLabel">灰</span></button>
 
 <script>
@@ -273,13 +354,12 @@
   'use strict';
 
   const DEFAULT_GROUPS = [
-    { name: '股票', codes: ['sh600519'] },
-    { name: '指数', codes: ['sh000905', 'sh000688', 'bj899050', 'hkHSTECH'] },
-    { name: '国内商品期货', codes: ['nf_RB0', 'nf_CU0', 'nf_AU0', 'nf_AG0', 'nf_I0', 'nf_M0', 'nf_MA0', 'nf_SC0'] },
-    { name: '海外期货', codes: ['hf_OIL', 'hf_CL', 'hf_GC', 'hf_SI'] },
+    { name: '股票', codes: ['sh600519', 'sh600036', 'sh601318'] },
+    { name: '指数', codes: ['sh000905', 'sh000688', 'bj899050', 'hkHSTECH', 'sh000001', 'sz399001'] },
+    { name: '国内商品期货', codes: ['nf_RB0', 'nf_CU0', 'nf_AU0', 'nf_AG0', 'nf_I0', 'nf_M0', 'nf_MA0', 'nf_SC0', 'nf_TA0', 'nf_P0'] },
+    { name: '海外期货', codes: ['hf_OIL', 'hf_CL', 'hf_GC', 'hf_SI', 'hf_NG', 'hf_HG'] },
   ];
 
-  const WATCH_KEY = 'leek-futures-watch';
   const CONFIG_POLL_MS = 3000; // 配置文件轮询间隔（毫秒）
   const banner = document.getElementById('banner');
   const dot = document.getElementById('dot');
@@ -305,6 +385,25 @@
   const posCancel = document.getElementById('posCancel');
   const posClose = document.getElementById('posClose');
   const posMsg = document.getElementById('posMsg');
+  const settleMask = document.getElementById('settleMask');
+  const settleTitle = document.getElementById('settleTitle');
+  const settleInfo = document.getElementById('settleInfo');
+  const settlePrice = document.getElementById('settlePrice');
+  const settleSave = document.getElementById('settleSave');
+  const settleCancel = document.getElementById('settleCancel');
+  const settleClose = document.getElementById('settleClose');
+  const settleMsg = document.getElementById('settleMsg');
+  const historyMask = document.getElementById('historyMask');
+  const historySub = document.getElementById('historySub');
+  const historyBody = document.getElementById('historyBody');
+  const historyClose = document.getElementById('historyClose');
+  const addMask = document.getElementById('addMask');
+  const addInfo = document.getElementById('addInfo');
+  const addGroupSel = document.getElementById('addGroupSel');
+  const addCancel = document.getElementById('addCancel');
+  const addConfirm = document.getElementById('addConfirm');
+  const addClose = document.getElementById('addClose');
+  const addMsg = document.getElementById('addMsg');
 
   // ===== 一键灰度（黑白）切换 =====
   const THEME_KEY = 'leek-futures-gray';
@@ -331,24 +430,28 @@
 
   let timer = null;
   let lastDataMap = {};
-  let configGroups = null; // 服务端配置文件分组（null = 尚未加载，先用默认）
+  let configGroups = null; // 服务端看盘分组（null = 尚未加载，先用默认）
   let configPositions = []; // 持仓（来自数据库 /api/positions）
   let configSig = '';      // 配置签名，用于检测变化
-  let watchGroups = loadWatchGroups(); // 自选（本地 localStorage）
 
-  function loadWatchGroups() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(WATCH_KEY));
-      if (Array.isArray(saved) && saved.length) return saved;
-    } catch (e) { /* ignore */ }
-    return [];
-  }
-  function saveWatchGroups() { localStorage.setItem(WATCH_KEY, JSON.stringify(watchGroups)); }
   function allGroups() {
+    // 渲染用：过滤掉空分组（configGroups 保留完整信息供添加/删除时按 name 查找）
     const base = configGroups && configGroups.length ? configGroups : DEFAULT_GROUPS;
-    return watchGroups.length ? base.concat(watchGroups) : base;
+    return base.filter((g) => g.codes && g.codes.length > 0);
+  }
+  // 按品种代码类型归类到对应的看盘分组名
+  function groupNameFor(code) {
+    const c = String(code || '');
+    if (/^nf_/.test(c)) return '国内商品期货';
+    if (/^hf_/.test(c)) return '海外期货';
+    // 指数：上证 sh000 / 深证 sz399 / 北证 bj899 / 港股字母指数（如 hkHSTECH）
+    if (/^sh000/.test(c) || /^sz399/.test(c) || /^bj899/.test(c) || /^hk[A-Z]+$/.test(c)) return '指数';
+    return '股票';
   }
 
+  // 沪市指数代码（纯 6 位数字、000 开头）：这些是上证/中证系列指数，需加 sh 前缀，
+  // 不能按首位 0 判成深市股票。如 000300 沪深300、000905 中证500、000688 科创50 等。
+  const SH_INDEX_TAIL = /^000(300|905|852|688|016|010)$/;
   function normalizeCode(raw) {
     let s = String(raw || '').trim().toUpperCase();
     if (!s) return '';
@@ -358,8 +461,9 @@
     if (/^(SH|SZ|BJ)\d/.test(s)) return s.toLowerCase();
     // 港股：hk 前缀（如 hkHSTECH 恒生科技 / hk00700 腾讯）
     if (/^HK/.test(s)) return 'hk' + s.slice(2);
-    // 纯 6 位数字按首位判断交易所：6→沪、0/3→深、4/8→北
+    // 纯 6 位数字：先判沪市指数（000 开头的指数代码加 sh 前缀），再按首位判断交易所：6→沪、0/3→深、4/8→北
     if (/^\d{6}$/.test(s)) {
+      if (SH_INDEX_TAIL.test(s)) return 'sh' + s;
       if (/^[56]/.test(s)) return 'sh' + s;
       if (/^[03]/.test(s)) return 'sz' + s;
       return 'bj' + s;
@@ -367,19 +471,109 @@
     if (/^[A-Z]+\d/.test(s)) return 'nf_' + s;
     return 'hf_' + s;
   }
-  function addCode(code) {
-    if (!code || allCodes().includes(code)) return;
-    let g = watchGroups.find((x) => x.name === '自选');
-    if (!g) { g = { name: '自选', codes: [] }; watchGroups.push(g); }
-    g.codes.push(code);
-    saveWatchGroups();
-    load();
+  // groupName 省略时按代码类型自动归类；返回是否添加成功
+  async function addCode(code, groupName) {
+    code = normalizeCode(code);
+    if (!code || allCodes().includes(code)) return false;
+    const name = groupName || groupNameFor(code);
+    const g = configGroups && configGroups.find((x) => x.name === name);
+    try {
+      let resp;
+      if (g && g.id) {
+        // 已有该分组：往里面追加代码
+        const codes = (g.codes || []).concat(code);
+        resp = await fetch('/api/groups/' + g.id, {
+          method: 'PUT',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ codes }),
+        });
+      } else {
+        // 没有该分组：新建并归类
+        resp = await fetch('/api/groups', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ name, codes: [code], sort_order: configGroups ? configGroups.length : 0 }),
+        });
+      }
+      if (resp.status === 401) { toLogin(); return false; }
+      if (!resp.ok) { alert('添加失败 HTTP ' + resp.status); return false; }
+      loadConfig(true);
+      return true;
+    } catch (e) {
+      alert('添加失败：' + e.message);
+      return false;
+    }
   }
-  function removeCode(code) {
-    watchGroups.forEach((g) => { g.codes = g.codes.filter((c) => c !== code); });
-    watchGroups = watchGroups.filter((g) => g.codes.length > 0);
-    saveWatchGroups();
-    load();
+
+  // ===== 添加品种：先展示详情确认，再选择分组 =====
+  let pendingCode = null;
+  async function openAddForm(rawCode, fallbackName) {
+    const code = normalizeCode(rawCode);
+    if (!code) { alert('请输入有效的品种代码'); return; }
+    pendingCode = code;
+    addMsg.textContent = '';
+    addConfirm.disabled = false;
+    // 分组下拉框按代码类型预选，用户可在弹窗里自行改成任意分组
+    addGroupSel.value = groupNameFor(code);
+    if (allCodes().includes(code)) {
+      addMsg.textContent = '该品种已在看盘清单中';
+      addConfirm.disabled = true;
+    }
+    addInfo.innerHTML = '代码：<b>' + code + '</b>' + (fallbackName ? '（' + fallbackName + '）' : '') +
+      '<br><span class="loading">获取行情…</span>';
+    addMask.classList.add('show');
+
+    // 优先复用已加载的行情，否则单独拉一次该品种的实时行情
+    let d = lastDataMap[code];
+    if (!d) {
+      try {
+        const resp = await fetch('/api/futures?codes=' + encodeURIComponent(code));
+        const list = parseSina(await resp.text());
+        d = list.find((x) => x.code === code);
+      } catch (e) { /* 拉不到行情就只展示代码信息 */ }
+    }
+    renderAddInfo(code, d, fallbackName);
+  }
+  function renderAddInfo(code, d, fallbackName) {
+    let html = '名称：<b>' + ((d && d.name) || fallbackName || '--') + '</b>（' + code + '）<br>' +
+      '类型：<b>' + groupNameFor(code) + '</b>';
+    if (d && !isNaN(Number(d.price)) && Number(d.price) !== 0) {
+      const price = Number(d.price), yest = Number(d.yestclose);
+      const updown = yest && !isNaN(yest) ? price - yest : 0;
+      const pct = yest && yest !== 0 ? (updown / yest) * 100 : 0;
+      const cls = updown > 0 ? 'up' : updown < 0 ? 'down' : 'flat';
+      const sign = updown > 0 ? '+' : '';
+      html += '<br>现价：<b class="' + cls + '">' + fmtNum(price) + '</b>' +
+        ' <span class="' + cls + '">' + sign + fmtNum(updown, 2) + '（' + sign + fmtNum(pct, 2) + '%）</span>';
+      if (d.time) html += '<br>时间：' + fmtTime(d.time);
+    } else {
+      html += '<br>现价：<span class="flat">暂无行情数据</span>';
+    }
+    addInfo.innerHTML = html;
+  }
+  function closeAddForm() { addMask.classList.remove('show'); pendingCode = null; }
+  async function confirmAdd() {
+    if (!pendingCode) return;
+    if (allCodes().includes(pendingCode)) { addMsg.textContent = '该品种已在看盘清单中'; return; }
+    const ok = await addCode(pendingCode, addGroupSel.value);
+    if (ok) closeAddForm();
+  }
+  async function removeCode(code) {
+    const g = configGroups && configGroups.find((x) => (x.codes || []).includes(code));
+    if (!g || !g.id) return;
+    const codes = g.codes.filter((c) => c !== code);
+    try {
+      const resp = await fetch('/api/groups/' + g.id, {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ codes }),
+      });
+      if (resp.status === 401) { toLogin(); return; }
+      if (!resp.ok) { alert('删除失败 HTTP ' + resp.status); return; }
+      loadConfig(true);
+    } catch (e) {
+      alert('删除失败：' + e.message);
+    }
   }
   function allCodes() {
     const base = allGroups().reduce((acc, g) => acc.concat(g.codes), []);
@@ -473,12 +667,35 @@
     return s;
   }
 
+  // ===== 持仓标记 =====
+  // 找出该代码在「我的」中的持仓（无持仓则 undefined）
+  function posOf(code) {
+    const c = normalizeCode(code);
+    return (configPositions || []).find((p) => p.code === c);
+  }
+  // 持仓悬浮提示：持仓 2 手 @1030
+  function posTip(pos) {
+    if (!pos) return '';
+    // 统一用 Number 转字符串，避免出现 1030.0 / 708.00 这类位数不齐的显示
+    const lots = Number(pos.lots);
+    const lotsTxt = Number.isInteger(lots) ? String(lots) : String(lots);
+    return '持仓 ' + lotsTxt + ' 手 @' + Number(pos.buyPrice);
+  }
+  // 名称单元格的标记与提示（持仓标签 + 分时图提示）
+  function nameCell(d, code, pos) {
+    const tag = pos ? '<span class="pos-tag">持</span>' : '';
+    const tips = [];
+    if (pos) tips.push(posTip(pos));
+    if (d && code.startsWith('nf_')) tips.push('查看分时图');
+    const title = tips.length ? ' title="' + tips.join(' · ') + '"' : '';
+    return '<td class="name"' + title + '>' + (d ? d.name : '--') + tag + '</td>';
+  }
+
   // ===== 渲染行情 =====
   function render(dataMap) {
     lastDataMap = dataMap;
     main.innerHTML = '';
     allGroups().forEach((g) => {
-      const isWatch = g.name === '自选';
       const sec = document.createElement('section');
       const h = document.createElement('h2');
       h.textContent = g.name;
@@ -490,9 +707,13 @@
       const tbody = table.querySelector('tbody');
       g.codes.forEach((code, idx) => {
         const d = dataMap[code];
+        const pos = posOf(code); // 该品种是否持有（在「我的」里）
         const tr = document.createElement('tr');
+        if (pos) tr.className = 'has-pos';
         if (!d) {
-          tr.innerHTML = `<td class="flat num">${idx + 1}</td><td class="name">--</td><td class="code">${code}</td><td colspan="4" class="flat">无数据</td><td></td>`;
+          tr.innerHTML = `<td class="flat num">${idx + 1}</td>` + nameCell(d, code, pos) +
+            `<td class="code">${code}</td><td colspan="4" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
+          tr.querySelector('.del').addEventListener('click', () => removeCode(code));
         } else {
           const price = Number(d.price), yest = Number(d.yestclose);
           const updown = yest && !isNaN(yest) ? price - yest : 0;
@@ -501,18 +722,17 @@
           const sign = updown > 0 ? '+' : '';
           const chartBtn = code.startsWith('nf_')
             ? '<button class="op chart" title="分时图">▦</button>' : '';
-          const delBtn = isWatch
-            ? '<button class="op del" title="删除">×</button>' : '';
+          const delBtn = '<button class="op del" title="删除">×</button>';
           tr.innerHTML =
             `<td class="flat num">${idx + 1}</td>` +
-            `<td class="name" title="查看分时图">${d.name}</td>` +
+            nameCell(d, code, pos) +
             `<td class="code">${code}</td>` +
             `<td class="${cls}">${fmtNum(price)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(updown, 2)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(pct, 2)}%</td>` +
             `<td class="flat">${fmtTime(d.time)}</td>` +
             `<td>${chartBtn}${delBtn}</td>`;
-          if (isWatch) tr.querySelector('.del').addEventListener('click', () => removeCode(code));
+          tr.querySelector('.del').addEventListener('click', () => removeCode(code));
           if (code.startsWith('nf_')) {
             tr.querySelector('.name').addEventListener('click', () => showChart(code));
             tr.querySelector('.chart').addEventListener('click', () => showChart(code));
@@ -581,6 +801,7 @@
 
     let html = '<section><div class="pos-head"><h2>我的</h2>' +
       '<div style="display:flex;gap:6px;">' +
+      '<button class="sort-btn" id="historyBtn">结算记录</button>' +
       '<button class="sort-btn" id="sortBtn">盈亏' + (sortDesc ? ' ↓' : ' ↑') + '</button>' +
       '<button class="sort-btn" id="addPosBtn">+ 新增</button></div></div>';
     html += '<table><thead><tr><th class="num">#</th><th>名称</th><th>现价</th><th>买入价</th><th>价差</th><th>手数</th><th>盈亏</th><th></th></tr></thead><tbody>';
@@ -596,7 +817,7 @@
           `<td class="${cls}">${isNaN(r.diff) ? '--' : sign + fmtNum(r.diff, 2)}</td>` +
           `<td>${r.lots}</td>` +
           `<td class="${cls}">${isNaN(r.pnl) ? '--' : (r.pnl > 0 ? '+' : '') + fmtNum(r.pnl, 0)} ${currencyLabel(r.currency)}</td>` +
-          `<td><button class="op edit" title="修改">✎</button><button class="op del" title="删除">×</button></td></tr>`;
+          `<td><button class="op edit" title="修改">✎</button><button class="op settle" title="结算平仓">≡</button><button class="op del" title="删除">×</button></td></tr>`;
       });
     }
     html += '</tbody></table>';
@@ -609,12 +830,17 @@
     box.innerHTML = html;
     const btn = box.querySelector('#sortBtn');
     if (btn) btn.addEventListener('click', () => { sortDesc = !sortDesc; renderPositions(lastDataMap); });
+    const histBtn = box.querySelector('#historyBtn');
+    if (histBtn) histBtn.addEventListener('click', openHistory);
     const addBtn2 = box.querySelector('#addPosBtn');
     if (addBtn2) addBtn2.addEventListener('click', () => openPosForm(null));
     box.querySelectorAll('.edit').forEach((b) => b.addEventListener('click', () => {
       const id = Number(b.closest('tr').dataset.id);
       const p = configPositions.find((x) => x.id === id);
       if (p) openPosForm(p);
+    }));
+    box.querySelectorAll('.settle').forEach((b) => b.addEventListener('click', () => {
+      openSettleForm(Number(b.closest('tr').dataset.id));
     }));
     box.querySelectorAll('.del').forEach((b) => b.addEventListener('click', () => {
       deletePos(Number(b.closest('tr').dataset.id));
@@ -721,6 +947,110 @@
       alert('删除失败：' + e.message);
     }
   }
+
+  // ===== 持仓结算 =====
+  let settlingPosId = null;
+  function openSettleForm(id) {
+    const p = configPositions.find((x) => x.id === id);
+    if (!p) return;
+    settlingPosId = id;
+    const d = lastDataMap[p.code];
+    const name = d ? d.name : p.code;
+    const curPrice = d ? Number(d.price) : NaN;
+    const cur = isNaN(curPrice) ? '--' : fmtNum(curPrice);
+    settleTitle.textContent = '结算持仓';
+    settleInfo.innerHTML = '品种：<b>' + name + '</b>（' + p.code + '）<br>' +
+      '买入价：<b>' + fmtNum(Number(p.buyPrice)) + '</b> · 手数：<b>' + p.lots + '</b> · 现价：<b>' + cur + '</b>';
+    settlePrice.value = isNaN(curPrice) ? '' : curPrice;
+    settleMsg.textContent = '';
+    settleMask.classList.add('show');
+    settlePrice.focus();
+    settlePrice.select();
+  }
+  function closeSettleForm() { settleMask.classList.remove('show'); settlingPosId = null; }
+  async function settlePos() {
+    const raw = settlePrice.value.trim();
+    const price = Number(raw);
+    if (raw === '' || isNaN(price)) { settleMsg.textContent = '请输入结算价'; return; }
+    if (!settlingPosId) { settleMsg.textContent = '未选择持仓'; return; }
+    const p = configPositions.find((x) => x.id === settlingPosId);
+    if (!p) { settleMsg.textContent = '持仓不存在'; return; }
+    const d = lastDataMap[p.code];
+    const name = d ? d.name : null;
+    const payload = {
+      settle_price: price,
+      name,
+      currency: currencyOf(p.code),
+      multiplier: multiplierOf(p),
+    };
+    try {
+      const resp = await fetch('/api/positions/' + settlingPosId + '/settle', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      if (resp.status === 401) { toLogin(); return; }
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        settleMsg.textContent = err.detail || ('HTTP ' + resp.status);
+        return;
+      }
+      closeSettleForm();
+      loadPositions();
+    } catch (e) {
+      settleMsg.textContent = '结算失败：' + e.message;
+    }
+  }
+
+  // ===== 结算记录 =====
+  async function openHistory() {
+    historyMask.classList.add('show');
+    historyBody.innerHTML = '<div class="flat" style="padding:8px;">加载中…</div>';
+    try {
+      const resp = await fetch('/api/settlements', { headers: authHeaders() });
+      if (resp.status === 401) { toLogin(); return; }
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const list = await resp.json();
+      historySub.textContent = '共 ' + list.length + ' 笔';
+      if (!list.length) { historyBody.innerHTML = '<div class="flat" style="padding:8px;">暂无结算记录</div>'; return; }
+      let html = '<table class="settle-table"><thead><tr><th>品种</th><th>买入价</th><th>结算价</th><th>手数</th><th>盈亏</th><th>时间</th></tr></thead><tbody>';
+      list.forEach((s) => {
+        const cls = s.pnl > 0 ? 'up' : s.pnl < 0 ? 'down' : 'flat';
+        const nm = s.name || s.code;
+        const t = String(s.settled_at || '').replace('T', ' ').slice(0, 19);
+        html += '<tr>' +
+          '<td class="name" title="' + s.code + '">' + nm + '</td>' +
+          '<td>' + fmtNum(s.buy_price) + '</td>' +
+          '<td>' + fmtNum(s.settle_price) + '</td>' +
+          '<td>' + s.lots + '</td>' +
+          '<td class="' + cls + '">' + (s.pnl > 0 ? '+' : '') + fmtNum(s.pnl, 0) + ' ' + currencyLabel(s.currency) + '</td>' +
+          '<td class="flat">' + t + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      historyBody.innerHTML = html;
+    } catch (e) {
+      historyBody.innerHTML = '<div class="up" style="padding:8px;">加载失败：' + e.message + '</div>';
+    }
+  }
+
+  settleSave.addEventListener('click', settlePos);
+  settleCancel.addEventListener('click', closeSettleForm);
+  settleClose.addEventListener('click', closeSettleForm);
+  settleMask.addEventListener('click', (e) => { if (e.target === settleMask) closeSettleForm(); });
+  settlePrice.addEventListener('keydown', (e) => { if (e.key === 'Enter') settlePos(); });
+  historyClose.addEventListener('click', () => historyMask.classList.remove('show'));
+  historyMask.addEventListener('click', (e) => { if (e.target === historyMask) historyMask.classList.remove('show'); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeSettleForm(); historyMask.classList.remove('show'); closeAddForm(); }
+  });
+
+  addConfirm.addEventListener('click', confirmAdd);
+  addCancel.addEventListener('click', closeAddForm);
+  addClose.addEventListener('click', closeAddForm);
+  addMask.addEventListener('click', (e) => { if (e.target === addMask) closeAddForm(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAddForm(); });
+
   posSave.addEventListener('click', savePos);
   posCancel.addEventListener('click', closePosForm);
   posClose.addEventListener('click', closePosForm);
@@ -943,9 +1273,9 @@
       div.innerHTML =
         `<span class="nm">${it.name}</span><span class="cd">${it.code}</span><span class="mk">${it.market}</span>`;
       div.addEventListener('click', () => {
-        addCode(it.code);
         hideSuggest();
         searchInput.value = '';
+        openAddForm(it.code, it.name);
       });
       suggestBox.appendChild(div);
     });
@@ -985,13 +1315,21 @@
 
   refreshBtn.addEventListener('click', load);
   intervalSel.addEventListener('change', setupTimer);
-  addBtn.addEventListener('click', () => { addCode(normalizeCode(searchInput.value)); searchInput.value = ''; hideSuggest(); });
+  addBtn.addEventListener('click', () => {
+    const kw = searchInput.value;
+    searchInput.value = '';
+    hideSuggest();
+    openAddForm(kw);
+  });
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const first = suggestBox.querySelector('.item');
-      if (suggestBox.classList.contains('show') && first) first.click();
-      else { addCode(normalizeCode(searchInput.value)); searchInput.value = ''; }
+      // 联想列表已展开时点第一项（内部会关闭联想并打开确认弹窗）
+      if (suggestBox.classList.contains('show') && first) { first.click(); return; }
+      const kw = searchInput.value;
+      searchInput.value = '';
       hideSuggest();
+      openAddForm(kw);
     }
   });
 
@@ -1005,9 +1343,10 @@
       if (force || sig !== configSig) {
         configSig = sig;
         configGroups = (Array.isArray(gs) ? gs : []).map((g) => ({
+              id: Number(g.id),
               name: String(g.name || '未命名'),
               codes: (Array.isArray(g.codes) ? g.codes : []).map(normalizeCode).filter(Boolean),
-            })).filter((g) => g.codes.length > 0);
+            }));
         load();
       }
     } catch (e) {
@@ -1018,7 +1357,7 @@
     // 持仓来自数据库 /api/positions，不再读 config.json
     try {
       const resp = await fetch('/api/positions', { headers: authHeaders() });
-      if (resp.status === 401) { toLogin(); return; }
+      // 未登录不跳转：静默按无持仓处理，先展示看板默认品种
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const ps = await resp.json();
       configPositions = ps.map((p) => ({

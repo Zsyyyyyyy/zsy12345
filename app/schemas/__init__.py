@@ -6,6 +6,8 @@ from app.schemas.schemas import (
     PositionCreate,
     PositionUpdate,
     PositionOut,
+    SettlementCreate,
+    SettlementOut,
     WatchGroupCreate,
     WatchGroupUpdate,
     WatchGroupOut,
@@ -14,5 +16,6 @@ from app.schemas.schemas import (
 __all__ = [
     "UserRegister", "UserLogin", "Token", "UserOut",
     "PositionCreate", "PositionUpdate", "PositionOut",
+    "SettlementCreate", "SettlementOut",
     "WatchGroupCreate", "WatchGroupUpdate", "WatchGroupOut",
 ]

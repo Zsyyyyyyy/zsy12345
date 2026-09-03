@@ -8,6 +8,7 @@ from app.core.database import Base, engine
 from app.routers.auth import router as auth_router
 from app.routers.futures import router as futures_router
 from app.routers.positions import router as positions_router
+from app.routers.settlements import router as settlements_router
 from app.routers.watchlist import router as watchlist_router
 
 # 启动时自动建表（已手动建过则无副作用；生产环境建议换 Alembic 迁移）
@@ -45,6 +46,9 @@ app.include_router(futures_router)
 
 # 持仓 CRUD 接口：/api/positions
 app.include_router(positions_router)
+
+# 结算接口：/api/positions/{id}/settle、/api/settlements
+app.include_router(settlements_router)
 
 # 看盘分组 CRUD 接口：/api/groups
 app.include_router(watchlist_router)

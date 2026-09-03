@@ -1,3 +1,3 @@
-from app.models.models import User, Position, WatchGroup
+from app.models.models import User, Position, WatchGroup, Settlement
 
-__all__ = ["User", "Position", "WatchGroup"]
+__all__ = ["User", "Position", "WatchGroup", "Settlement"]

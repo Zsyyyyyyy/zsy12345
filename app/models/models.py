@@ -49,3 +49,20 @@ class WatchGroup(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"
     )
+
+
+class Settlement(Base):
+    """结算记录（持仓平仓时的成交快照与盈亏，按用户隔离）"""
+    __tablename__ = "settlements"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="所属用户 id")
+    code: Mapped[str] = mapped_column(String(32), nullable=False, comment="品种代码（如 nf_SA2701）")
+    name: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="品种名称快照")
+    buy_price: Mapped[float] = mapped_column(Float, nullable=False, comment="买入价快照")
+    settle_price: Mapped[float] = mapped_column(Float, nullable=False, comment="结算价")
+    lots: Mapped[float] = mapped_column(Float, default=1.0, nullable=False, comment="手数")
+    multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="每点价值快照")
+    pnl: Mapped[float] = mapped_column(Float, nullable=False, comment="盈亏 = (结算价-买入价)*手数*乘数")
+    currency: Mapped[str] = mapped_column(String(8), default="CNY", nullable=False, comment="币种 CNY/USD/HKD")
+    settled_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="结算时间")

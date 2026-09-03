@@ -32,6 +32,12 @@ def login_page():
     return FileResponse(BASE_DIR / "login.html")
 
 
+@app.get("/favicon.svg")
+def favicon():
+    """浏览器标签页小图标"""
+    return FileResponse(BASE_DIR / "favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/futures")
 def futures_page():
     """行情看板（前端展示，接口由本后端提供）"""

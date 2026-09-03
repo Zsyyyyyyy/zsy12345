@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时间戳转换</title>
+    <style>
+        *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
+        :root {
+            --bg: #0a0a0a; --card-bg: #111; --card-border: #262626;
+            --text: #d4d4d4; --text-secondary: #666;
+            --accent: #58a6ff; --accent-hover: #79c0ff;
+            --input-bg: #0a0a0a; --input-border: #333;
+            --success: #3fb950; --shadow: 0 4px 24px rgba(0,0,0,0.5);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #000; color: var(--text);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+
+        .term {
+            width: 100%; max-width: 600px;
+            background: #0d0d0d; border: 1px solid #262626;
+            border-radius: 10px; overflow: hidden;
+        }
+        .term-bar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 12px 16px; background: #151515;
+            border-bottom: 1px solid #262626;
+        }
+        .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .term-dot.r { background: #ff5f56; }
+        .term-dot.y { background: #ffbd2e; }
+        .term-dot.g { background: #27c93f; }
+        .term-label {
+            margin-left: 8px; font-size: 12px; color: #555;
+            font-family: "SF Mono","Monaco",monospace;
+        }
+
+        .container {
+            padding: 28px 32px 36px;
+        }
+
+        .header { text-align: center; margin-bottom: 32px; }
+        .header h1 {
+            font-size: 18px; font-weight: 400; color: #d4d4d4;
+            font-family: "SF Mono","Monaco","Consolas",monospace;
+            margin-bottom: 6px; letter-spacing: 0.5px;
+        }
+        .header .subtitle { font-size: 12px; color: var(--text-secondary); letter-spacing: 1px; }
+        .back-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 12px; margin-bottom: 12px; transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--text); }
+
+        /* Current timestamp display */
+        .current-ts {
+            background: var(--input-bg); border: 1px solid var(--input-border);
+            border-radius: 14px; padding: 20px 24px; margin-bottom: 24px;
+            text-align: center;
+        }
+        .current-ts .label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .current-ts .ts-row { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; }
+        .current-ts .ts-item { display: flex; flex-direction: column; align-items: center; }
+        .current-ts .ts-item .ts-title { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+        .current-ts .ts-item .ts-value {
+            font-size: 18px; font-weight: 700; font-family: "SF Mono","JetBrains Mono","Menlo",monospace;
+            color: var(--accent); word-break: break-all;
+        }
+        .copy-btn {
+            background: none; border: 1px solid var(--input-border); color: var(--text-secondary);
+            border-radius: 6px; padding: 2px 10px; font-size: 11px; cursor: pointer;
+            margin-top: 4px; font-family: inherit; transition: all 0.2s;
+        }
+        .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .copy-btn.copied { border-color: var(--success); color: var(--success); }
+
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+        /* Timestamp -> DateTime */
+        .input-group { display: flex; gap: 10px; margin-bottom: 12px; }
+        .input-group input, .input-group select {
+            background: var(--input-bg); border: 2px solid var(--input-border);
+            border-radius: 12px; padding: 12px 16px; color: var(--text);
+            font-size: 15px; font-family: "SF Mono","JetBrains Mono","Menlo",monospace;
+            outline: none; transition: border-color 0.2s;
+        }
+        .input-group input:focus, .input-group select:focus { border-color: var(--accent); }
+        .input-group input { flex: 1; }
+        .input-group select { width: 110px; cursor: pointer; appearance: none; -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 4l3 3 3-3' stroke='%2394a3b8' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 10px center;
+        }
+        .input-group select option { background: #1e293b; }
+        .result-box {
+            background: var(--input-bg); border: 1px solid var(--input-border);
+            border-radius: 12px; padding: 16px 20px; font-family: "SF Mono","JetBrains Mono","Menlo",monospace;
+            font-size: 18px; font-weight: 600; text-align: center; color: var(--success);
+            min-height: 56px; display: flex; align-items: center; justify-content: center;
+            word-break: break-all;
+        }
+        .result-box.empty { color: var(--text-secondary); font-weight: 400; font-size: 14px; }
+
+        /* DateTime -> Timestamp */
+        .dt-input-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .dt-input-row input {
+            background: var(--input-bg); border: 2px solid var(--input-border);
+            border-radius: 12px; padding: 12px 16px; color: var(--text);
+            font-size: 15px; font-family: "SF Mono","JetBrains Mono","Menlo",monospace;
+            outline: none; transition: border-color 0.2s; width: 70px; text-align: center;
+        }
+        .dt-input-row input:focus { border-color: var(--accent); }
+        .dt-input-row .sep { display: flex; align-items: center; color: var(--text-secondary); font-weight: 700; font-size: 18px; }
+        .dt-input-row input.dt-wide { width: 90px; }
+
+        .btn {
+            width: 100%; padding: 14px 24px; border-radius: 12px; font-size: 15px; font-weight: 600;
+            border: none; cursor: pointer; transition: all 0.2s; font-family: inherit;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
+
+        .divider { height: 1px; background: var(--card-border); margin: 28px 0; }
+
+        @media (max-width: 520px) {
+            .container { padding: 24px 18px; border-radius: 16px; }
+            .current-ts .ts-row { gap: 16px; }
+            .current-ts .ts-item .ts-value { font-size: 15px; }
+            .dt-input-row input { width: 55px; font-size: 13px; padding: 10px; }
+            .dt-input-row input.dt-wide { width: 70px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="term">
+        <div class="term-bar">
+            <span class="term-dot r"></span>
+            <span class="term-dot y"></span>
+            <span class="term-dot g"></span>
+            <span class="term-label">zsy@macbook — timestamp</span>
+        </div>
+        <div class="container">
+        <a class="back-link" href="/">← cd ..</a>
+        <div class="header">
+            <h1>$ timestamp-converter</h1>
+            <div class="subtitle">Unix Timestamp ↔ DateTime</div>
+        </div>
+
+        <!-- Current timestamp -->
+        <div class="current-ts">
+            <div class="label">当前时间戳</div>
+            <div class="ts-row">
+                <div class="ts-item">
+                    <div class="ts-title">秒 (10位)</div>
+                    <div class="ts-value" id="nowSeconds">--</div>
+                    <button class="copy-btn" data-target="nowSeconds">复制</button>
+                </div>
+                <div class="ts-item">
+                    <div class="ts-title">毫秒 (13位)</div>
+                    <div class="ts-value" id="nowMillis">--</div>
+                    <button class="copy-btn" data-target="nowMillis">复制</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timestamp -> DateTime -->
+        <div class="section">
+            <div class="section-title">时间戳 → 日期时间</div>
+            <div class="input-group">
+                <input type="text" id="tsInput" placeholder="输入时间戳，如 1753315200">
+                <select id="tsUnit">
+                    <option value="s">秒 (10位)</option>
+                    <option value="ms">毫秒 (13位)</option>
+                </select>
+            </div>
+            <div class="result-box empty" id="tsResult">等待输入...</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- DateTime -> Timestamp -->
+        <div class="section">
+            <div class="section-title">日期时间 → 时间戳</div>
+            <div class="dt-input-row">
+                <input type="number" id="dtYear" placeholder="年" class="dt-wide" min="1970" max="2100">
+                <span class="sep">-</span>
+                <input type="number" id="dtMonth" placeholder="月" min="1" max="12">
+                <span class="sep">-</span>
+                <input type="number" id="dtDay" placeholder="日" min="1" max="31">
+                <span class="sep">&nbsp;</span>
+                <input type="number" id="dtHour" placeholder="时" min="0" max="23" value="0">
+                <span class="sep">:</span>
+                <input type="number" id="dtMinute" placeholder="分" min="0" max="59" value="0">
+                <span class="sep">:</span>
+                <input type="number" id="dtSecond" placeholder="秒" min="0" max="59" value="0">
+            </div>
+            <button class="btn btn-primary" id="btnDtToTs">转换为时间戳</button>
+            <div class="result-box empty" id="dtResult" style="margin-top:12px;">等待输入...</div>
+        </div>
+    </div>
+    </div>
+
+<script>
+(function() {
+    var $ = function(id) { return document.getElementById(id); };
+
+    // --- Live timestamp ---
+    function updateNow() {
+        var now = Date.now();
+        $('nowSeconds').textContent = Math.floor(now / 1000);
+        $('nowMillis').textContent = now;
+    }
+    updateNow();
+    setInterval(updateNow, 1000);
+
+    // --- Copy buttons ---
+    document.querySelectorAll('.copy-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var targetId = btn.dataset.target;
+            var text = $(targetId).textContent;
+            navigator.clipboard.writeText(text).then(function() {
+                btn.textContent = '已复制';
+                btn.classList.add('copied');
+                setTimeout(function() { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+            });
+        });
+    });
+
+    // --- Timestamp -> DateTime (实时) ---
+    var tsInput = $('tsInput'), tsUnit = $('tsUnit'), tsResult = $('tsResult');
+
+    function tsToDt() {
+        var raw = tsInput.value.trim();
+        if (!raw) { tsResult.textContent = '等待输入...'; tsResult.className = 'result-box empty'; return; }
+        var ts = parseInt(raw, 10);
+        if (isNaN(ts) || ts < 0) { tsResult.textContent = '无效的时间戳'; tsResult.className = 'result-box empty'; return; }
+        if (tsUnit.value === 's') ts = ts * 1000;
+        var d = new Date(ts);
+        if (isNaN(d.getTime())) { tsResult.textContent = '无效的时间戳'; tsResult.className = 'result-box empty'; return; }
+        var y = d.getFullYear();
+        var M = String(d.getMonth()+1).padStart(2,'0');
+        var D = String(d.getDate()).padStart(2,'0');
+        var h = String(d.getHours()).padStart(2,'0');
+        var m = String(d.getMinutes()).padStart(2,'0');
+        var s = String(d.getSeconds()).padStart(2,'0');
+        var dayNames = ['日','一','二','三','四','五','六'];
+        tsResult.textContent = y+'-'+M+'-'+D+' '+h+':'+m+':'+s+'  星期'+dayNames[d.getDay()];
+        tsResult.className = 'result-box';
+    }
+
+    tsInput.addEventListener('input', tsToDt);
+    tsUnit.addEventListener('change', tsToDt);
+
+    // --- DateTime -> Timestamp ---
+    var dtYear=$('dtYear'),dtMonth=$('dtMonth'),dtDay=$('dtDay'),
+        dtHour=$('dtHour'),dtMinute=$('dtMinute'),dtSecond=$('dtSecond'),
+        dtResult=$('dtResult'), btnDtToTs=$('btnDtToTs');
+
+    // 自动填充当前日期
+    var now = new Date();
+    dtYear.value = now.getFullYear();
+    dtMonth.value = now.getMonth()+1;
+    dtDay.value = now.getDate();
+
+    function dtToTs() {
+        var y=parseInt(dtYear.value),M=parseInt(dtMonth.value),D=parseInt(dtDay.value),
+            h=parseInt(dtHour.value)||0,mi=parseInt(dtMinute.value)||0,s=parseInt(dtSecond.value)||0;
+        if (isNaN(y)||isNaN(M)||isNaN(D)) { dtResult.textContent = '请填写完整的年月日'; dtResult.className = 'result-box empty'; return; }
+        var d = new Date(y, M-1, D, h, mi, s);
+        if (isNaN(d.getTime())) { dtResult.textContent = '无效的日期'; dtResult.className = 'result-box empty'; return; }
+        var ts = Math.floor(d.getTime() / 1000);
+        dtResult.innerHTML = '秒: <b>'+ts+'</b>　　毫秒: <b>'+(ts*1000)+'</b>';
+        dtResult.className = 'result-box';
+    }
+
+    btnDtToTs.addEventListener('click', dtToTs);
+
+    // 回车触发
+    [dtYear,dtMonth,dtDay,dtHour,dtMinute,dtSecond].forEach(function(inp) {
+        inp.addEventListener('keydown', function(e) { if (e.key==='Enter') dtToTs(); });
+    });
+})();
+</script>
+</body>
+</html>

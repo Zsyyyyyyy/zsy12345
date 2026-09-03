@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>货币转换器</title>
+    <style>
+        *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            color: #d4d4d4;
+            min-height: 100vh;
+            padding: 20px 12px;
+        }
+
+        .term {
+            max-width: 640px; margin: 0 auto;
+            background: #0d0d0d; border: 1px solid #262626;
+            border-radius: 10px; overflow: hidden;
+        }
+        .term-bar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 16px; background: #151515;
+            border-bottom: 1px solid #262626;
+        }
+        .term-dot { width: 11px; height: 11px; border-radius: 50%; }
+        .term-dot.r { background: #ff5f56; }
+        .term-dot.y { background: #ffbd2e; }
+        .term-dot.g { background: #27c93f; }
+        .term-label { margin-left: 6px; font-size: 12px; color: #555; }
+        .back-link {
+            margin-left: auto; font-size: 12px; color: #58a6ff; text-decoration: none;
+            border: 1px solid #2a3a4a; padding: 3px 9px; border-radius: 5px; transition: all .15s;
+        }
+        .back-link:hover { background: #16202c; }
+
+        .content { padding: 22px 22px 26px; }
+
+        .sec-h { font-size: 14px; color: #f0883e; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
+        .sec-n { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #f0883e; color: #000; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+
+        .error-msg { display: none; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 12px; text-align: center; margin-bottom: 12px; }
+        .error-msg.show { display: block; }
+        .loading { display: none; text-align: center; padding: 10px 0; color: #666; font-size: 12px; margin-bottom: 10px; }
+        .loading.show { display: block; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #333; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: -2px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .result-banner { display: none; background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; text-align: center; }
+        .result-banner.show { display: block; }
+        .result-banner .result-title { font-size: 11px; color: #3fb950; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .result-banner .result-source { font-size: 13px; color: #888; margin-bottom: 8px; }
+        .result-banner .result-targets { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+        .result-target { display: flex; flex-direction: column; align-items: center; }
+        .result-target .target-currency { font-size: 10px; color: #666; margin-bottom: 2px; }
+        .result-target .target-value { font-size: 20px; font-weight: 700; color: #d4d4d4; }
+
+        .input-section { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+
+        .currency-row {
+            display: flex; align-items: center; gap: 10px;
+            background: #0a0a0a; border: 2px solid #333;
+            border-radius: 12px; padding: 8px 10px 8px 14px;
+            transition: all 0.2s ease;
+        }
+        .currency-row:focus-within { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+        .currency-row.result { border-color: #3fb950; background: rgba(16,185,129,0.04); }
+        .currency-row.fixed { border-color: rgba(100,116,139,0.5); }
+
+        .currency-icon {
+            width: 38px; height: 38px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: 700; flex-shrink: 0;
+        }
+        .icon-cny { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .icon-usd { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .icon-thb { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .icon-twd { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .icon-rub { background: rgba(168,85,247,0.15); color: #a855f7; }
+        .icon-vnd { background: rgba(20,184,166,0.15); color: #14b8a6; }
+
+        .currency-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .currency-label { font-size: 11px; color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+        .currency-name { font-size: 13px; font-weight: 600; }
+
+        .currency-input-wrap input {
+            width: 150px; background: transparent; border: none;
+            color: #d4d4d4; font-size: 22px; font-weight: 600;
+            text-align: right; padding: 6px 2px; outline: none;
+        }
+        .currency-input-wrap input::placeholder { color: #666; opacity: 0.35; }
+        .currency-input-wrap input::-webkit-outer-spin-button,
+        .currency-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .currency-input-wrap input[type=number] { -moz-appearance: textfield; }
+
+        .currency-select-row {
+            display: flex; align-items: center; gap: 10px;
+            background: #0a0a0a; border: 2px solid #333;
+            border-radius: 12px; padding: 8px 10px 8px 14px;
+            transition: all 0.2s ease;
+        }
+        .currency-select-row:focus-within { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+        .currency-select-row.result { border-color: #3fb950; background: rgba(16,185,129,0.04); }
+
+        .currency-select {
+            appearance: none; -webkit-appearance: none;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid #333; border-radius: 8px; padding: 6px 28px 6px 10px;
+            color: #d4d4d4; font-size: 13px; font-weight: 600;
+            cursor: pointer; outline: none; font-family: inherit;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 8px center;
+        }
+        .currency-select:hover { border-color: #58a6ff; }
+        .currency-select option { background: #1e293b; color: #e2e8f0; }
+
+        .btn { width: 100%; padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: inherit; margin-bottom: 8px; }
+        .btn-primary { background: #58a6ff; color: #fff; }
+        .btn-primary:hover { background: #79c0ff; }
+        .btn-secondary { background: transparent; color: #666; border: 2px solid #333; }
+        .btn-secondary:hover { border-color: #666; color: #d4d4d4; }
+
+        .rates-section { background: #0a0a0a; border: 1px solid #262626; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+        .rates-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .rates-title { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
+        .live-dot { width: 7px; height: 7px; background: #3fb950; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .update-time { font-size: 10px; color: #666; }
+        .rate-grid { display: flex; flex-direction: column; gap: 2px; }
+        .rate-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(51,65,85,0.5); }
+        .rate-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .rate-pair { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
+        .rate-arrow { color: #666; font-size: 11px; }
+        .rate-value { font-size: 16px; font-weight: 700; color: #d4d4d4; }
+
+        .footer { text-align: center; font-size: 10px; color: #666; opacity: 0.6; }
+    </style>
+</head>
+<body>
+    <div class="term">
+        <div class="term-bar">
+            <span class="term-dot r"></span>
+            <span class="term-dot y"></span>
+            <span class="term-dot g"></span>
+            <span class="term-label">zsy@macbook — currency converter</span>
+            <a class="back-link" href="/">← cd ..</a>
+        </div>
+
+        <div class="content">
+            <div class="sec-h"><span class="sec-n">¥</span>货币转换器</div>
+
+            <div class="error-msg" id="errorMsg"></div>
+            <div class="loading" id="loading"><span class="spinner"></span>正在获取实时汇率...</div>
+
+            <div class="result-banner" id="resultBanner">
+                <div class="result-title">✅ 转换结果</div>
+                <div class="result-source" id="resultSource"></div>
+                <div class="result-targets" id="resultTargets"></div>
+            </div>
+
+            <div class="input-section">
+                <div class="currency-row fixed" id="rowCNY">
+                    <div class="currency-icon icon-cny">¥</div>
+                    <div class="currency-info"><div class="currency-label">CNY</div><div class="currency-name">人民币</div></div>
+                    <div class="currency-input-wrap"><input type="number" id="inputCNY" placeholder="0.00" step="any" min="0"></div>
+                </div>
+                <div class="currency-row fixed" id="rowUSD">
+                    <div class="currency-icon icon-usd">$</div>
+                    <div class="currency-info"><div class="currency-label">USD</div><div class="currency-name">美元</div></div>
+                    <div class="currency-input-wrap"><input type="number" id="inputUSD" placeholder="0.00" step="any" min="0"></div>
+                </div>
+                <div class="currency-select-row" id="rowDynamic">
+                    <div class="currency-icon" id="dynamicIcon">฿</div>
+                    <div class="currency-info">
+                        <select class="currency-select" id="currencySelect">
+                            <option value="THB">THB · 泰铢</option>
+                            <option value="TWD">TWD · 新台币</option>
+                            <option value="RUB">RUB · 卢布</option>
+                            <option value="VND">VND · 越南盾</option>
+                        </select>
+                    </div>
+                    <div class="currency-input-wrap"><input type="number" id="inputDynamic" placeholder="0.00" step="any" min="0"></div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="btnConvert">🔍 查询转换</button>
+            <button class="btn btn-secondary" id="btnClear">✕ 清空</button>
+
+            <div class="rates-section">
+                <div class="rates-header">
+                    <div class="rates-title"><span class="live-dot"></span>实时汇率</div>
+                    <div class="update-time" id="updateTime">--</div>
+                </div>
+                <div class="rate-grid">
+                    <div class="rate-item">
+                        <div class="rate-pair">美元 USD <span class="rate-arrow">→</span> 人民币 CNY</div>
+                        <div class="rate-value" id="rateUSDCNY">--</div>
+                    </div>
+                    <div class="rate-item">
+                        <div class="rate-pair">美元 USD <span class="rate-arrow">→</span> <span id="rateLabelUSDX">泰铢 THB</span></div>
+                        <div class="rate-value" id="rateUSDX">--</div>
+                    </div>
+                    <div class="rate-item">
+                        <div class="rate-pair">人民币 CNY <span class="rate-arrow">→</span> <span id="rateLabelCNYX">泰铢 THB</span></div>
+                        <div class="rate-value" id="rateCNYX">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">数据来源: open.er-api.com · 汇率仅供参考</div>
+        </div>
+    </div>
+
+<script>
+(function() {
+    var rates = { USD: 1, CNY: null, TWD: null, THB: null, RUB: null, VND: null };
+    var $ = function(id) { return document.getElementById(id); };
+
+    var inputCNY = $('inputCNY'), inputUSD = $('inputUSD'), inputDynamic = $('inputDynamic');
+    var rowCNY = $('rowCNY'), rowUSD = $('rowUSD'), rowDynamic = $('rowDynamic');
+    var dynamicIcon = $('dynamicIcon');
+    var currencySelect = $('currencySelect');
+    var rateLabelUSDX = $('rateLabelUSDX'), rateLabelCNYX = $('rateLabelCNYX');
+    var btnConvert = $('btnConvert'), btnClear = $('btnClear');
+    var errorMsg = $('errorMsg'), loading = $('loading'), updateTime = $('updateTime');
+    var resultBanner = $('resultBanner'), resultSource = $('resultSource'), resultTargets = $('resultTargets');
+
+    var curNames = { THB:'泰铢', TWD:'新台币', RUB:'卢布', VND:'越南盾', CNY:'人民币', USD:'美元' };
+    var curSymbols = { THB:'฿ ', TWD:'NT$ ', RUB:'₽ ', VND:'₫ ', CNY:'¥ ', USD:'$ ' };
+    var curIcons = { THB:'฿', TWD:'NT$', RUB:'₽', VND:'₫' };
+    var curIconClasses = { THB:'icon-thb', TWD:'icon-twd', RUB:'icon-rub', VND:'icon-vnd' };
+
+    function getSelectedCurrency() { return currencySelect.value; }
+    function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('show'); setTimeout(function(){ errorMsg.classList.remove('show'); }, 5000); }
+    function fmt(n, d) { return (n==null||isNaN(n)) ? '--' : Number(n).toFixed(d||2); }
+    function fmtMoney(n, c) { if(n==null||isNaN(n)) return '--'; var dec=(c==='TWD'||c==='VND')?0:2; return (curSymbols[c]||'')+Number(n).toFixed(dec); }
+
+    function updateDynamicUI() {
+        var cur = getSelectedCurrency();
+        dynamicIcon.textContent = curIcons[cur];
+        dynamicIcon.className = 'currency-icon ' + (curIconClasses[cur]||'');
+        rateLabelUSDX.textContent = curNames[cur] + ' ' + cur;
+        rateLabelCNYX.textContent = curNames[cur] + ' ' + cur;
+        updateRateDisplay();
+    }
+    function updateRateDisplay() {
+        var cur = getSelectedCurrency();
+        $('rateUSDCNY').textContent = fmt(rates.CNY, 2);
+        if (rates[cur] != null) { $('rateUSDX').textContent = fmt(rates[cur], 2); $('rateCNYX').textContent = fmt(rates[cur]/rates.CNY, 2); $('rateUSDX').textContent = $('rateUSDX').textContent.replace(' (估)',''); $('rateCNYX').textContent = $('rateCNYX').textContent.replace(' (估)',''); }
+        else { $('rateUSDX').textContent = '--'; $('rateCNYX').textContent = '--'; }
+    }
+    async function fetchRates() {
+        loading.classList.add('show'); errorMsg.classList.remove('show');
+        try {
+            var resp = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(10000) });
+            if (!resp.ok) throw new Error('HTTP '+resp.status);
+            var data = await resp.json();
+            if (data.result !== 'success') throw new Error('API error');
+            rates.CNY = data.rates.CNY; rates.TWD = data.rates.TWD; rates.THB = data.rates.THB; rates.RUB = data.rates.RUB; rates.VND = data.rates.VND;
+            if (!rates.CNY||!rates.TWD||!rates.THB||!rates.RUB||!rates.VND) throw new Error('Missing data');
+            var now = new Date();
+            updateTime.textContent = '更新于 '+now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            updateRateDisplay(); loading.classList.remove('show'); return true;
+        } catch(e) {
+            loading.classList.remove('show');
+            rates.CNY=7.25; rates.TWD=32.5; rates.THB=34.5; rates.RUB=90.0; rates.VND=25400.0;
+            updateTime.textContent = '离线估算'; updateRateDisplay();
+            $('rateUSDCNY').textContent+=' (估)'; $('rateUSDX').textContent+=' (估)'; $('rateCNYX').textContent+=' (估)';
+            showError('⚠️ 实时汇率获取失败，使用估算汇率。'); return false;
+        }
+    }
+    function convert() {
+        var vCNY=parseFloat(inputCNY.value), vUSD=parseFloat(inputUSD.value), vDyn=parseFloat(inputDynamic.value);
+        var hCNY=!!inputCNY.value&&!isNaN(vCNY)&&vCNY>=0, hUSD=!!inputUSD.value&&!isNaN(vUSD)&&vUSD>=0, hDyn=!!inputDynamic.value&&!isNaN(vDyn)&&vDyn>=0;
+        var cnt=(hCNY?1:0)+(hUSD?1:0)+(hDyn?1:0);
+        if(cnt===0){showError('请至少输入一个金额');return;}
+        if(cnt>1){showError('请只在一种货币中输入金额');return;}
+        var selCur=getSelectedCurrency();
+        if(!rates.CNY||!rates[selCur]){showError('汇率数据尚未加载，请刷新页面重试');return;}
+        var srcCur,srcVal;
+        if(hCNY){srcCur='CNY';srcVal=vCNY;}else if(hUSD){srcCur='USD';srcVal=vUSD;}else{srcCur=selCur;srcVal=vDyn;}
+        var usdVal;
+        if(srcCur==='USD')usdVal=srcVal; else if(srcCur==='CNY')usdVal=srcVal/rates.CNY; else usdVal=srcVal/rates[srcCur];
+        var all={};all.CNY=usdVal*rates.CNY;all.USD=usdVal;all[selCur]=usdVal*rates[selCur];
+        var targets=['CNY','USD',selCur].filter(function(c){return c!==srcCur;});
+        var html='';targets.forEach(function(c){html+='<div class="result-target"><div class="target-currency">'+curNames[c]+' ('+c+')</div><div class="target-value">'+fmtMoney(all[c],c)+'</div></div>';});
+        resultSource.textContent=fmtMoney(srcVal,srcCur)+' '+curNames[srcCur];resultTargets.innerHTML=html;resultBanner.classList.add('show');
+        [rowCNY,rowUSD,rowDynamic].forEach(function(r){r.classList.remove('result');});
+        inputCNY.value='';inputUSD.value='';inputDynamic.value='';
+        targets.forEach(function(c){
+            if(c==='CNY'){rowCNY.classList.add('result');inputCNY.value=all.CNY.toFixed(2);}
+            else if(c==='USD'){rowUSD.classList.add('result');inputUSD.value=all.USD.toFixed(2);}
+            else{rowDynamic.classList.add('result');inputDynamic.value=all[c].toFixed((c==='TWD'||c==='VND')?0:2);}
+        });
+    }
+    function clearAll(){inputCNY.value='';inputUSD.value='';inputDynamic.value='';rowCNY.classList.remove('result');rowUSD.classList.remove('result');rowDynamic.classList.remove('result');resultBanner.classList.remove('show');}
+    currencySelect.addEventListener('change',function(){updateDynamicUI();clearAll();});
+    [inputCNY,inputUSD,inputDynamic].forEach(function(inp){inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();convert();}});});
+    btnConvert.addEventListener('click',convert);btnClear.addEventListener('click',clearAll);
+    updateDynamicUI();fetchRates();
+})();
+</script>
+</body>
+</html>

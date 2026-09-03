@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="DNg1LCIbFfWFKhwGGEOvdZ">
+<head data-page-node-id="h3wwfX27q3FKONo0b2G17B">
+    <meta charset="UTF-8" data-page-node-id="iCcjWyKk7oblkBjDE9K5Ht">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="VqUGte1xIlmhAnpvwOTmMm">
+    <title>ZSY12345 · 工具箱</title>
+    <style>
+        *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            background: #000;
+            padding: 28px 16px 40px;
+        }
+
+        .terminal {
+            width: 920px;
+            max-width: 100%;
+            background: #0d0d0d;
+            border-radius: 10px;
+            border: 1px solid #262626;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+        }
+
+        .titlebar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 16px;
+            background: #151515;
+            border-bottom: 1px solid #262626;
+        }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        .dot.red { background: #ff5f56; }
+        .dot.yellow { background: #ffbd2e; }
+        .dot.green { background: #27c93f; }
+        .title { margin-left: 12px; font-size: 15px; color: #666; }
+
+        .titlebar .nav { margin-left: auto; display: flex; gap: 8px; }
+        .nav-btn {
+            padding: 5px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .nav-btn.outline {
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            background: transparent;
+        }
+        .nav-btn.outline:hover { border-color: #58a6ff; color: #fff; }
+        .nav-btn.solid {
+            color: #fff;
+            background: #238636;
+            border: 1px solid #2ea043;
+        }
+        .nav-btn.solid:hover { background: #2ea043; }
+
+        .nav-group { display: flex; gap: 8px; align-items: center; }
+        .nav-group.hidden { display: none; }
+        .username { font-size: 13px; color: #79c0ff; margin-right: 4px; }
+
+        .prompt-line {
+            padding: 16px 20px 4px;
+            font-size: 15px;
+            color: #8b949e;
+        }
+        .prompt-line .user { color: #7ee787; }
+        .prompt-line .host { color: #79c0ff; }
+        .prompt-line .path { color: #d2a8ff; }
+        .prompt-line .p { color: #f0f6fc; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            padding: 18px 20px 22px;
+        }
+
+        .card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 16px 8px 14px;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #c9d1d9;
+            min-height: 96px;
+            transition: all 0.18s ease;
+        }
+        .card:hover {
+            background: #1a1a1a;
+            border-color: #444;
+            transform: translateY(-3px);
+        }
+        .card .num {
+            font-size: 11px;
+            color: #58a6ff;
+            letter-spacing: 0.5px;
+        }
+        .card .icon {
+            font-size: 24px;
+            line-height: 1;
+            opacity: 0.85;
+        }
+        .card .name {
+            font-size: 13px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .card .ext-tag {
+            position: absolute;
+            font-size: 9px;
+            color: #d2a8ff;
+        }
+
+        .card.ext  .num { color: #d2a8ff; }
+        .card.game .num { color: #ff7b72; }
+        .card.fun  .num { color: #ffa657; }
+        .card.note .num { color: #3fb950; }
+        .card.tool .num { color: #58a6ff; }
+
+        .card.placeholder {
+            background: #0c0c0c;
+            border: 1px dashed #1f1f1f;
+            cursor: default;
+        }
+        .card.placeholder:hover { transform: none; background: #0c0c0c; border-color: #1f1f1f; }
+        .card.placeholder .icon { opacity: 0.28; }
+        .card.placeholder .name { color: #4d4d4d; white-space: normal; font-size: 12px; }
+
+        .footer {
+            padding: 0 20px 18px;
+            font-size: 13px;
+            color: #484f58;
+        }
+
+        @media (max-width: 760px) {
+            .grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 420px) {
+            .grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body data-page-node-id="hRLQ6m8a4k9Ybohq93XQpv">
+
+<div class="terminal" data-page-node-id="ElqTCB4B97406Ek1n4wZlF">
+    <div class="titlebar" data-page-node-id="iCrbvzuJ6VlUoC84TEUdEF">
+        <span class="dot red" data-page-node-id="BeCT0UloBAXP0k4WXawCDu"></span>
+        <span class="dot yellow" data-page-node-id="Fdz54IaTvhH0FjYYCxZVPC"></span>
+        <span class="dot green" data-page-node-id="c803MXZHQ7aWenJ0BD6kmw"></span>
+        <span class="title" data-page-node-id="Hsn5uN7Mtzs1cvC9Jn0J6b">zsy12345 — tools</span>
+        <nav class="nav">
+            <div class="nav-group" id="nav-guest">
+                <a class="nav-btn outline" href="/login#register">注册</a>
+                <a class="nav-btn solid" href="/login">登录</a>
+            </div>
+            <div class="nav-group hidden" id="nav-user">
+                <span class="username" id="nav-username"></span>
+                <a class="nav-btn outline" href="#" onclick="logout(event)">退出</a>
+            </div>
+        </nav>
+    </div>
+
+    <div class="prompt-line" data-page-node-id="JAvNRpD6jDXaJjy30asgTt">
+        <span class="user" data-page-node-id="hhlWlOku55h7fAs0LD8GOb">zsy</span><span class="p" data-page-node-id="9EhgtnzLaaL6K0oJFVjkSG">@</span><span class="host" data-page-node-id="mConY4ettJyF81tqLH6RXg">macbook</span><span class="p" data-page-node-id="XsKRVVX65T2VDIRLStC4sv">:</span><span class="path" data-page-node-id="LpHGkne47r8vPy26f3j4GD">~/tools</span><span class="p" data-page-node-id="DTGhiFJGl19oizkOyrndD2">$</span> ls
+    </div>
+
+    <div class="grid" data-page-node-id="ptkvEjvnxV6UzFqkmeeoY0">
+        <!-- ===== 真实工具 ===== -->
+        <a class="card ext" href="https://www.json.cn/?fullscreen" target="_blank" rel="noopener" data-page-node-id="tkvZFynJG8I4mpfCXIcio3">
+            <span class="num" data-page-node-id="kr6t979M4Vqkp1uN8I0CGX">01</span>
+            <span class="icon" data-page-node-id="3LyCoO0uX343pZAb9OEfOL">{ }</span>
+            <span class="name" data-page-node-id="5sTTj8fMPmr0cexyMj8996">JSON 格式化</span>
+        </a>
+
+        <a class="card tool" href="/modules/timestamp/timestamp.html" data-page-node-id="tb1rQa38LCHQDNwoUUGovp">
+            <span class="num" data-page-node-id="aoVUnOVLsCOUQAzc6W5mrc">02</span>
+            <span class="icon" data-page-node-id="3asFQz5W9jHRnSDdnDLEvY">⏱</span>
+            <span class="name" data-page-node-id="aAaiKleKmcYDKsvr43TvX0">时间戳转换</span>
+        </a>
+
+        <a class="card tool" href="/modules/hash/hash.html" data-page-node-id="EKNQ29Ymfi4pp3wFX2GBGA">
+            <span class="num" data-page-node-id="1chJFOocVkPi3WaUCFsxGe">03</span>
+            <span class="icon" data-page-node-id="G0WqoOh76B4bQZzBOqy6Bf">#</span>
+            <span class="name" data-page-node-id="eIuETl0chUpj2f6KNAUo1l">哈希值计算</span>
+        </a>
+
+        <a class="card tool" href="/modules/currency-converter/currency-converter.html" data-page-node-id="XfqRBW9XTPOYNBVEX3tn9T">
+            <span class="num" data-page-node-id="jXNSJYbARCDSP6lAkrJyBg">04</span>
+            <span class="icon" data-page-node-id="mzyVvccuZA1omlCrCZs4E6">¥</span>
+            <span class="name" data-page-node-id="uqDdrUyw8tP8nIBzdEEcmd">汇率转换</span>
+        </a>
+
+        <a class="card game" href="/modules/tetris/tetris.html" data-page-node-id="yM1Fpi1cQZUJJCAo6tdDT5">
+            <span class="num" data-page-node-id="cvHBKU0bu1Huat0FDNWmNn">05</span>
+            <span class="icon" data-page-node-id="eE794ZHeZbswqJnQJFYBgd">▦</span>
+            <span class="name" data-page-node-id="kPtJq2oHz5nqQ8kcbiU3Zd">俄罗斯方块</span>
+        </a>
+
+        <a class="card fun" href="/modules/fortune/fortune.html" data-page-node-id="L0lBcPRs7MUalXhnmuf5xD">
+            <span class="num" data-page-node-id="3bxWAeCFovBAmiUooDiUEL">06</span>
+            <span class="icon" data-page-node-id="sCGT2nNy6jbRRrd9icx0hx">✦</span>
+            <span class="name" data-page-node-id="eG5SJZSjC8miVDJZwBNkF6">灵签占卜</span>
+        </a>
+
+        <a class="card tool" href="/modules/zhconvert/zhconvert.html" data-page-node-id="bs3ibhLBM0lwpgDkoAfVDi">
+            <span class="num" data-page-node-id="mgoYmuMGEveAs9Ye4TQ9q7">07</span>
+            <span class="icon" data-page-node-id="l9MgjCOk23VBaDo1uHnoYh">繁</span>
+            <span class="name" data-page-node-id="3j5xFBTfvaGpAslBq2TVpp">简繁转换</span>
+        </a>
+
+        <a class="card note" href="/modules/notes/notes.html" data-page-node-id="8VzrMdJegSU2jLjCwFhmRK">
+            <span class="num" data-page-node-id="U3LqaOae3jCHx4oySK0f1I">08</span>
+            <span class="icon" data-page-node-id="HdAmVY4ydmdPsh4kYHquj3">✎</span>
+            <span class="name" data-page-node-id="3snjX5BfLjHSajiPMNzU5J">笔记本</span>
+        </a>
+
+        <a class="card tool" href="/modules/price-calc/price-calc.html" data-page-node-id="cx5I87C52tsAJ8VlrJjJdj">
+            <span class="num" data-page-node-id="Ds7siQGUhzXx22zmQ38sTy">09</span>
+            <span class="icon" data-page-node-id="13fgeO1b6lfXoz2IAQfaTH">$</span>
+            <span class="name" data-page-node-id="IQafkQtzECdhghRXy1A1jX">定价模拟器</span>
+        </a>
+
+        <!-- ===== 占位卡片 ===== -->
+        <a class="card tool" href="/futures" data-page-node-id="Y4nqU1sXy3UHhNPru0lUiF"><span class="num" data-page-node-id="Bf3UCZvl6F08GCdUloWKc2">10</span><span class="icon" data-page-node-id="WuwJPMJfBNIdKdaadJUEWk">📈</span><span class="name" data-page-node-id="gov07nY7VO4Dx3pqU5rwzF">行情看板</span></a>
+        <div class="card placeholder" data-page-node-id="OTQ5zxjuCQl3IHVIY31vMp"><span class="num" data-page-node-id="wvlPeEOeUMSZbUCCP40NXd">11</span><span class="icon" data-page-node-id="C5KcwZJc96C99XdmcmNy2b">✧</span><span class="name" data-page-node-id="2wWihLTu7LEGpZK5TLn04w">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="GdiY2ugfI34MZURb7oh9Lm"><span class="num" data-page-node-id="OQChW4DAXwsVtAT4gFSj1j">12</span><span class="icon" data-page-node-id="e3PNMQ5bXOZNQKRK9bFlPb">✧</span><span class="name" data-page-node-id="PAZzjznJJtRPKdONyAhg3G">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="L8lhQw2JzyLgV3MseAHFf3"><span class="num" data-page-node-id="A3HS06w44qiTQa9EPAyGBy">13</span><span class="icon" data-page-node-id="ZfX6TAeG6Gr4bDSKT1tOBA">✧</span><span class="name" data-page-node-id="SIzxJT78t0UMzekW5JwjOq">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="kHnsAPsoExoleUBq5vtuy4"><span class="num" data-page-node-id="sdFp09O1Ae19ZBVDbl6SoF">14</span><span class="icon" data-page-node-id="gVQexB1EdbWz3YzMl9NkK8">✧</span><span class="name" data-page-node-id="WfG1CB5cIWox5YyEx5KSOr">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="yiohFUpjqmrALcJuFNWIn8"><span class="num" data-page-node-id="KB2fG3x4d4aY8G35zt10F1">15</span><span class="icon" data-page-node-id="uNNdUsEcEUUKH2gKAPHef2">✧</span><span class="name" data-page-node-id="mWyS6KO5qbNAVWzMw4x5rO">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="kMm4XRzsJfHyj3cvQJJoX1"><span class="num" data-page-node-id="zfAcPFFQJ7ZKYLopcpnSeC">16</span><span class="icon" data-page-node-id="x6QLqHWawDIGHzJe5Zp2Hi">✧</span><span class="name" data-page-node-id="cgDC6nsfyJErvGoFE9inTn">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="QJtt3cNTKTMYBFB6YhXiaB"><span class="num" data-page-node-id="JAfoocJje641mhHrW00o1W">17</span><span class="icon" data-page-node-id="o1cDbRE2tUg28cDKqzeGwv">✧</span><span class="name" data-page-node-id="PR8P8ExsXRL6riN5gjDnBG">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="eW4TZcCSEbUXhFymABH6HX"><span class="num" data-page-node-id="zcE2BR2V19vZQ2foMG5jjT">18</span><span class="icon" data-page-node-id="kYC6JB5ys9DyvkHEo5NfMw">✧</span><span class="name" data-page-node-id="gzLB9BrNRpxF8tqlnBFUWM">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="BOYlR8CURV9LRiWmUA7c6Y"><span class="num" data-page-node-id="mDe3VaTsfJU6FUKb3Z46ne">19</span><span class="icon" data-page-node-id="6ywNxdn4wrypmS0y8cIfM9">✧</span><span class="name" data-page-node-id="CBldCSQVCdGX0GI4iaZ6EK">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="ioq0kxcoSUTbqX5oAqP7dm"><span class="num" data-page-node-id="G1BoT6IRCFXN3ZgChgOrJR">20</span><span class="icon" data-page-node-id="QVqPUgrGzd6oQcBQn0HsIM">✧</span><span class="name" data-page-node-id="ucgZ7EX6b9Wrx0yyccNrlQ">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="TvE4aHxQH6aYqkCwohxYgY"><span class="num" data-page-node-id="EyL4CPltBtKPW2iGwPyDGi">21</span><span class="icon" data-page-node-id="usu2mfwWeu27qaYNyb8V4H">✧</span><span class="name" data-page-node-id="dwa5jDFFXRd5pDtfFwrnIe">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="5ch1lejQ7Lth8npZR32b2L"><span class="num" data-page-node-id="Z2tVAAfbxp80xMZcjs8SCu">22</span><span class="icon" data-page-node-id="lZ3vBwOJkEp1pM7EE4uoNO">✧</span><span class="name" data-page-node-id="G2Ch95oo0ZjMGjDDcprPtF">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="bMZlccYOLgy0vOA6HJlZnF"><span class="num" data-page-node-id="HfXmQLnO2Xr6AAYNXFMFnv">23</span><span class="icon" data-page-node-id="0IbCGoqCRFPSSGrgerMA5q">✧</span><span class="name" data-page-node-id="66makq323uRCIMeHLhVjwy">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="G1aYhLaZFwaIok7GdFDNly"><span class="num" data-page-node-id="YBXFyxW9Fx61Gg1ZyxlPDA">24</span><span class="icon" data-page-node-id="MQ5rAEMCfd1CorCXnHS7jU">✧</span><span class="name" data-page-node-id="TCr55ZGu3ZspvqnZptNzrI">敬请期待</span></div>
+        <div class="card placeholder" data-page-node-id="AUaCoQtwvAsgTcshRHGuUw"><span class="num" data-page-node-id="sKWFEAlduphqF8TLrdvnv7">25</span><span class="icon" data-page-node-id="SDSgTG6FMapn1pKvx4h6gJ">✧</span><span class="name" data-page-node-id="8f9bG7ZfONwEDTaTrvlLp0">敬请期待</span></div>
+    </div>
+
+    <div class="footer" data-page-node-id="LCWR0fdbu5JTZh2cayjRHm">10 个工具已上线 · 共 25 格</div>
+</div>
+
+<script>
+    // 根据本地 token 判断登录态，切换右上角按钮
+    async function initNav() {
+        const token = localStorage.getItem('token');
+        if (!token) return; // 未登录，保持默认「注册 / 登录」
+        try {
+            const res = await fetch('/me', { headers: { 'Authorization': 'Bearer ' + token } });
+            if (!res.ok) throw new Error();
+            const me = await res.json();
+            document.getElementById('nav-username').textContent = me.username;
+            document.getElementById('nav-guest').classList.add('hidden');
+            document.getElementById('nav-user').classList.remove('hidden');
+        } catch (e) {
+            // token 失效则忽略，仍按未登录展示
+        }
+    }
+
+    function logout(e) {
+        e.preventDefault();
+        localStorage.removeItem('token');
+        window.location.reload();
+    }
+
+    initNav();
+</script>
+
+</body>
+</html>

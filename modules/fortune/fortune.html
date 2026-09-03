@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灵签占卜</title>
+<style>
+  *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
+  :root {
+    --bg: #0a0a0f;
+    --card: #14141f;
+    --gold: #c9a96e;
+    --gold-light: #e8d5a3;
+    --red: #b5343a;
+    --red-light: #d6454a;
+    --text: #d4d4dc;
+    --text-dim: #8888a0;
+    --border: #2a2a3a;
+    --accent: #6b3fa0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #000;
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+
+  .term {
+    width: 100%; max-width: 480px;
+    background: #0d0d0d; border: 1px solid #262626;
+    border-radius: 10px; overflow: hidden;
+    position: relative; z-index: 1;
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; background: #151515;
+    border-bottom: 1px solid #262626;
+  }
+  .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .term-dot.r { background: #ff5f56; }
+  .term-dot.y { background: #ffbd2e; }
+  .term-dot.g { background: #27c93f; }
+  .term-label {
+    margin-left: 8px; font-size: 12px; color: #555;
+    font-family: "SF Mono","Monaco",monospace;
+  }
+
+  /* --- Particles Background --- */
+  #particles {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 0;
+  }
+
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    animation: float linear infinite;
+    opacity: 0;
+  }
+
+  @keyframes float {
+    0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* --- Layout --- */
+  .app {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 520px;
+    padding: 20px;
+    display: flex; flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .back-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: var(--text-secondary); text-decoration: none;
+    font-size: 12px; margin-bottom: 12px; transition: color 0.2s;
+    align-self: flex-start;
+  }
+  .back-link:hover { color: var(--text); }
+
+  /* --- Header --- */
+  .header {
+    text-align: center; padding: 40px 0 24px;
+    width: 100%;
+  }
+  .header h1 {
+    font-size: 2.4rem;
+    background: linear-gradient(180deg, var(--gold-light), var(--gold));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700; letter-spacing: 8px;
+    margin-bottom: 8px;
+  }
+  .header .subtitle {
+    color: var(--text-dim); font-size: 0.85rem;
+    letter-spacing: 4px;
+  }
+
+  /* --- Tab Navigation --- */
+  .tabs {
+    display: flex; gap: 8px; margin-bottom: 32px;
+    background: var(--card); border-radius: 40px;
+    padding: 5px; border: 1px solid var(--border);
+    width: 100%;
+  }
+  .tab-btn {
+    flex: 1; padding: 12px 8px; border: none;
+    border-radius: 36px; cursor: pointer;
+    background: transparent; color: var(--text-dim);
+    font-size: 0.9rem; font-family: inherit;
+    transition: all 0.3s; white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  .tab-btn.active {
+    background: linear-gradient(135deg, var(--accent), #4a2080);
+    color: #fff; box-shadow: 0 4px 20px rgba(107, 63, 160, 0.4);
+  }
+  .tab-btn:hover:not(.active) {
+    color: var(--gold-light);
+  }
+
+  /* --- Divination Card --- */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 36px 28px;
+    width: 100%; text-align: center;
+    position: relative; overflow: hidden;
+    min-height: 340px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    transition: all 0.5s;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(201,169,110,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .card-icon {
+    font-size: 4rem; margin-bottom: 16px;
+    filter: drop-shadow(0 0 20px rgba(201,169,110,0.3));
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .card-title {
+    font-size: 1.3rem; color: var(--gold-light);
+    margin-bottom: 8px; letter-spacing: 2px;
+  }
+  .card-desc {
+    color: var(--text-dim); font-size: 0.9rem;
+    line-height: 1.6; max-width: 360px;
+  }
+
+  /* --- Buttons --- */
+  .btn {
+    margin-top: 24px; padding: 14px 48px;
+    border: none; border-radius: 40px; cursor: pointer;
+    font-size: 1rem; font-family: inherit; letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--red), var(--red-light));
+    color: #fff; position: relative; overflow: hidden;
+    transition: all 0.3s; font-weight: 600;
+    box-shadow: 0 6px 24px rgba(181, 52, 58, 0.35);
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(181, 52, 58, 0.5);
+  }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled {
+    opacity: 0.5; cursor: not-allowed; transform: none;
+    box-shadow: none;
+  }
+
+  /* --- Result View --- */
+  .result-card {
+    width: 100%; padding: 0;
+    animation: fadeInUp 0.6s ease;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-badge {
+    display: inline-block; padding: 6px 20px;
+    border-radius: 20px; font-size: 0.85rem;
+    letter-spacing: 2px; margin-bottom: 16px; font-weight: 600;
+  }
+  .badge-excellent { background: rgba(201,169,110,0.2); color: var(--gold-light); border: 1px solid var(--gold); }
+  .badge-good      { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1px solid #e74c3c; }
+  .badge-medium    { background: rgba(142,142,160,0.15); color: #aaa; border: 1px solid #666; }
+  .badge-bad       { background: rgba(52,73,94,0.2); color: #7f8c8d; border: 1px solid #555; }
+  .badge-terrible  { background: rgba(0,0,0,0.3); color: #666; border: 1px solid #333; }
+
+  .result-poem {
+    font-size: 1.1rem; color: var(--gold-light);
+    line-height: 2.2; margin: 16px 0; letter-spacing: 1px;
+    font-style: italic;
+  }
+  .result-interpretation {
+    color: var(--text); font-size: 0.95rem;
+    line-height: 1.8; text-align: left;
+    padding: 20px; background: rgba(255,255,255,0.02);
+    border-radius: 12px; border: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .result-interpretation b { color: var(--gold-light); }
+  .result-advice {
+    margin-top: 16px; padding: 14px 20px;
+    background: rgba(107,63,160,0.1);
+    border-radius: 12px; border-left: 3px solid var(--accent);
+    font-size: 0.9rem; color: #b8b8cc; text-align: left;
+    line-height: 1.7;
+  }
+
+  /* --- Moon Blocks (掷筊) --- */
+  .moon-blocks {
+    display: flex; gap: 40px; justify-content: center;
+    margin: 30px 0;
+  }
+  .moon-block {
+    width: 60px; height: 90px;
+    background: linear-gradient(180deg, #b87333, #8b4513);
+    border-radius: 30px 30px 15px 15px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+  }
+  .moon-block::after {
+    content: ""; position: absolute; inset: 6px;
+    border-radius: 27px 27px 12px 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.1), transparent);
+  }
+  .moon-block.tossing {
+    animation: toss 1s ease-in-out;
+  }
+  @keyframes toss {
+    0%   { transform: rotate(0deg) translateY(0); }
+    25%  { transform: rotate(-30deg) translateY(-60px); }
+    50%  { transform: rotate(15deg) translateY(-30px); }
+    75%  { transform: rotate(-10deg) translateY(-10px); }
+    100% { transform: rotate(0deg) translateY(0); }
+  }
+  .moon-block.flat {
+    transform: rotate(0deg);
+  }
+  .moon-block.round {
+    transform: rotate(180deg);
+  }
+
+  /* --- Tarot --- */
+  .tarot-grid {
+    display: flex; gap: 12px; justify-content: center;
+    flex-wrap: wrap; margin: 16px 0;
+  }
+  .tarot-card {
+    width: 90px; height: 140px; border-radius: 10px;
+    background: linear-gradient(135deg, #1a1040, #2a1560);
+    border: 2px solid var(--gold);
+    cursor: pointer; display: flex; align-items: center;
+    justify-content: center;
+    font-size: 2.5rem; transition: all 0.3s;
+    position: relative; overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .tarot-card::before {
+    content: "✦"; font-size: 1rem; color: var(--gold);
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    opacity: 0.6;
+  }
+  .tarot-card.back {
+    background: repeating-linear-gradient(
+      45deg, #1a1040, #1a1040 4px, #2a1560 4px, #2a1560 8px
+    );
+    border-color: var(--border);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .tarot-card.back::before { content: "?"; font-size: 1.4rem; color: var(--text-dim); top: auto; }
+  .tarot-card:hover:not(.revealed) {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 28px rgba(201,169,110,0.3);
+    border-color: var(--gold-light);
+  }
+  .tarot-card.revealed {
+    animation: cardReveal 0.6s ease;
+  }
+  @keyframes cardReveal {
+    0% { transform: rotateY(0deg); }
+    50% { transform: rotateY(90deg); }
+    100% { transform: rotateY(0deg); }
+  }
+
+  /* --- Stick Drawing (求签) --- */
+  .stick-tube {
+    width: 80px; height: 160px;
+    background: linear-gradient(180deg, #5c3a1e, #3d2510);
+    border-radius: 10px 10px 16px 16px;
+    position: relative; margin: 20px auto 40px;
+    box-shadow: inset 0 -8px 16px rgba(0,0,0,0.5);
+    cursor: pointer; transition: all 0.3s;
+  }
+  .stick-tube::before {
+    content: ""; position: absolute;
+    top: -8px; left: -4px; right: -4px; height: 16px;
+    background: linear-gradient(180deg, #7a4e28, #5c3a1e);
+    border-radius: 6px 6px 0 0;
+  }
+  .stick-tube:hover { transform: scale(1.02); }
+
+  .stick-tube.with-sticks {
+    background: linear-gradient(180deg, #5c3a1e, #3d2510);
+  }
+  .stick-in-tube {
+    position: absolute; bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 4px; background: linear-gradient(180deg, #d4a96a, #a67c4b);
+    border-radius: 2px; animation: stickRise 1.2s ease-out forwards;
+  }
+  @keyframes stickRise {
+    0%   { height: 4px; opacity: 0.3; }
+    60%  { height: 100px; opacity: 1; }
+    100% { height: 80px; opacity: 1; }
+  }
+
+  .drawn-stick {
+    display: inline-block; width: 6px; height: 140px;
+    background: linear-gradient(180deg, #d4a96a 40%, #a67c4b);
+    border-radius: 3px; margin: 0 auto 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .drawn-stick::after {
+    content: ""; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 0.65rem; color: #8b4513; letter-spacing: 1px;
+  }
+
+  .stick-number {
+    position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+    background: var(--red); color: #fff; width: 22px; height: 22px;
+    border-radius: 50%; font-size: 0.7rem; display: flex;
+    align-items: center; justify-content: center; font-weight: 700;
+  }
+
+  /* --- Loading --- */
+  .loading-text {
+    color: var(--gold-light); font-size: 1rem;
+    letter-spacing: 4px; animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  /* --- Footer --- */
+  .footer {
+    margin-top: auto; padding: 32px 0 20px;
+    color: var(--text-dim); font-size: 0.75rem;
+    text-align: center; letter-spacing: 2px;
+  }
+
+  /* --- Responsive --- */
+  @media (max-width: 400px) {
+    .app { padding: 12px; }
+    .tabs { gap: 4px; }
+    .tab-btn { font-size: 0.78rem; padding: 10px 6px; }
+    .card { padding: 28px 18px; }
+    .tarot-card { width: 70px; height: 110px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div class="term">
+    <div class="term-bar">
+        <span class="term-dot r"></span>
+        <span class="term-dot y"></span>
+        <span class="term-dot g"></span>
+        <span class="term-label">zsy@macbook — fortune</span>
+    </div>
+
+<div class="app">
+  <a class="back-link" href="/">← cd ..</a>
+  <div class="header">
+    <h1>灵 签 占 卜</h1>
+    <p class="subtitle">心诚则灵 · 随缘而安</p>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="qiuchen">🎋 求签</button>
+    <button class="tab-btn" data-tab="zhijiao">🪵 掷筊</button>
+    <button class="tab-btn" data-tab="tarot">🃏 塔罗</button>
+  </div>
+
+  <!-- Main Card -->
+  <div class="card" id="mainCard">
+    <div id="viewInit">
+      <div class="card-icon">🏮</div>
+      <div class="card-title">心诚则灵</div>
+      <div class="card-desc">
+        静下心来，想一个你关心的问题。<br>心诚则万事可问。
+      </div>
+      <button class="btn" id="btnDraw">开 始 占 卜</button>
+    </div>
+    <div id="viewLoading" style="display:none">
+      <div class="card-icon" style="font-size:3rem">🔮</div>
+      <div class="loading-text">天机推演中...</div>
+    </div>
+    <div id="viewResult" style="display:none"></div>
+  </div>
+</div>
+
+  <div class="footer">心诚则灵 · 仅供参考 · 不可尽信</div>
+</div>
+
+<script>
+/* ===== Data ===== */
+const FORTUNES = [
+  // 上上签 (Excellent) - 5
+  { level: 'excellent', label: '上上签', poem: '龙腾四海风云会\n凤舞九天日月新', interpretation: '<b>大吉之兆</b>。龙腾凤舞，万象更新。你所想之事，天时地利人和皆备，<b>大胆前行</b>，必有贵人相助。事业将有大转机，财运亨通。春华秋实，正是收获之时。', advice: '机会就在眼前，切勿犹豫不决。主动出击，良机稍纵即逝。保持谦逊，高处不胜寒。' },
+  { level: 'excellent', label: '上上签', poem: '紫气东来万象新\n福星高照满门庭', interpretation: '<b>紫气东来，福星高照</b>。此签为吉星之象，预示着好运将至。你所谋划之事皆可顺利推进，<b>贵人自远方来</b>。感情顺利，家庭和睦，诸事顺遂。', advice: '保持正念，广结善缘。好运需要你的主动配合才会显化。不妨多与人为善，播下善种必得善果。' },
+  { level: 'excellent', label: '上上签', poem: '日丽中天照万方\n花开富贵满华堂', interpretation: '<b>如日中天，富贵花开。</b>此签主事业大成，财运亨通。你正处于人生的上升期，所有付出都将获得回报。感情方面也有好消息，<b>有情人终成眷属</b>。', advice: '风光时更要守住本心。富贵不忘根本，成功不忘恩人。适当回馈身边的人，福气更能绵长。' },
+  { level: 'excellent', label: '上上签', poem: '玉出昆冈光自现\n舟行顺水遇长风', interpretation: '<b>美玉出世，乘风破浪。</b>你的才华终将被看见，就像埋在深山的美玉迟早会放射光芒。所行之事有如顺水推舟，<b>事半功倍</b>。', advice: '抓住当下的运势窗口期，积极展现自己。但也要保持耐心，好事多磨，稳扎稳打方能长久。' },
+  { level: 'excellent', label: '上上签', poem: '金鳞化龙跃九天\n一举登科天下传', interpretation: '<b>鲤鱼跃龙门，一举成名</b>。此签预示着重大突破与转折。你即将迎来人生的重要拐点，<b>所有的积累都将在此刻爆发</b>。学业、事业均有重大好消息。', advice: '保持平常心。成功只是新征程的起点，而非终点。继续精进，不断超越自我。' },
+
+  // 上签 (Good) - 5
+  { level: 'good', label: '上签', poem: '春风送暖入帘帷\n桃李芬芳次第开', interpretation: '<b>春风得意，花开次第。</b>你所期盼之事正在慢慢显现。虽然不能一蹴而就，但趋势向好，<b>耐心等待必有收获</b>。', advice: '善于把握节奏。有些事急不得，该来的总会来。在这段时间里做好准备工作，机会来时才不会手忙脚乱。' },
+  { level: 'good', label: '上签', poem: '雨后初晴山色翠\n云开月朗水光明', interpretation: '<b>云开见月，雨过天晴。</b>如果你正经历着一些波折，此签告诉你——难关将过，<b>光明就在前方</b>。之前的困扰很快会消散。', advice: '坚持下去，你已经走到了最困难的时候就快结束了。保持信心，转机就在下一站。' },
+  { level: 'good', label: '上签', poem: '松柏经霜犹劲节\n梅花傲雪更精神', interpretation: '<b>松柏经霜，梅花傲雪。</b>此签主坚韧与品格。眼前的困难是磨练你的机会。经历过此劫，你将更加强大。<b>梅花香自苦寒来</b>。', advice: '困难是化了妆的礼物。不要逃避挑战，迎难而上方显英雄本色。你的坚持终将得到回报。' },
+  { level: 'good', label: '上签', poem: '画龙须待点睛笔\n破浪还须借好风', interpretation: '<b>万事俱备，只欠东风。</b>你已经做了很多准备，就差那关键的一步。那个"时机"很快就要到来了，<b>保持警惕，随时准备出手</b>。', advice: '不要盲目行动，也不要坐等。观察局势，寻找那个最佳切入点。一旦时机成熟，果断出击。' },
+  { level: 'good', label: '上签', poem: '雏鹰展翅初试羽\n来日方长万里程', interpretation: '<b>雏鹰展翅，来日方长。</b>这是一个关于"开始"的签。你可能正处于某个新阶段的起点，虽然现在羽翼未丰，但<b>前途不可限量</b>。', advice: '不要因为起步时的生疏而气馁。每个人都是从新手开始的。多学多练，你很快就会找到自己的节奏。' },
+
+  // 中签 (Medium) - 6
+  { level: 'medium', label: '中签', poem: '山重水复疑无路\n柳暗花明又一村', interpretation: '<b>山穷水尽处，自有桃花源。</b>此签暗示当前局势看似困顿，实则转机即将出现。<b>不要被眼前的迷雾迷惑</b>，换个角度或许就是另外一番天地。', advice: '当一条路走不通时，不妨换条路试试。有时退一步不是失败，而是为更好的突破积蓄力量。' },
+  { level: 'medium', label: '中签', poem: '一叶扁舟泛五湖\n风波随处有还无', interpretation: '<b>随波逐流，顺势而为。</b>此签主"变通"。事态尚不明朗，<b>不宜强行推进</b>。保持灵活，适应变化，方能化险为夷。', advice: '暂时放下执念，让事情自然发展。有时候最好的策略就是"无为"——不强求、不抗拒，顺其自然。' },
+  { level: 'medium', label: '中签', poem: '月有阴晴圆缺事\n人有悲欢离合情', interpretation: '<b>月有盈亏，事有起伏。</b>这是自然规律，不必过于挂怀。你所担忧之事其实是<b>人生常态</b>，放宽心态面对即可。', advice: '接受不完美。生活本就充满变数，过于追求完美只会徒增烦恼。一切都会好的，时间是最好的解药。' },
+  { level: 'medium', label: '中签', poem: '欲穷千里目\n更上一层楼', interpretation: '<b>格局决定结局。</b>你可能需要站在更高的角度重新审视问题。目前的困境很大程度上来自<b>视角的局限</b>。', advice: '退一步重新审视全局。有些问题当你站得更高时就不再是问题了。寻求更广阔的视野和更长远的目光。' },
+  { level: 'medium', label: '中签', poem: '春风不度玉门关\n羌笛何须怨杨柳', interpretation: '<b>时机未到，莫要心急。</b>你想做的事可能还需要等待更好的时机。<b>强扭的瓜不甜</b>，耐心等一等，天时会来。', advice: '沉下心来做好手头的事。时机未到时，努力提升自己的实力就是最好的准备。等风来。' },
+  { level: 'medium', label: '中签', poem: '十年磨一剑\n霜刃未曾试', interpretation: '<b>厚积薄发，一鸣惊人。</b>你一直在积累力量，虽然现在看起来安静无波，但你的能力已经有了巨大提升。<b>爆发终有时</b>。', advice: '继续磨砺你的技能和能力。不要因为暂时的默默无闻而怀疑自己。当机会来临，你终将让人刮目相看。' },
+
+  // 下签 (Bad) - 4
+  { level: 'bad', label: '下签', poem: '屋漏偏逢连夜雨\n船迟又遇打头风', interpretation: '<b>时运不济，诸事不顺。</b>你最近可能感到处处碰壁。此签暗示你正处于<b>运势的低谷</b>，但请记住——低谷不会永远持续。', advice: '不要在这个阶段做重大决策。先稳住基本盘，静待运势转圜。越是逆境越要保持冷静，冲动只会让事情更糟。' },
+  { level: 'bad', label: '下签', poem: '画虎不成反类犬\n刻鹄不成尚类骛', interpretation: '<b>眼高手低，力不从心。</b>你的目标可能超出了当前的能力范围。与其好高骛远，不如<b>脚踏实地，从基础做起</b>。', advice: '重新评估你的目标是否现实。把大目标拆解成小步骤，一步步来。与其追求完美而停滞，不如先完成再完善。' },
+  { level: 'bad', label: '下签', poem: '是非只为多开口\n烦恼皆因强出头', interpretation: '<b>祸从口出，慎言慎行。</b>最近可能因言语不当而招惹是非。此签提醒你——<b>沉默是金</b>，不是所有事都需要你发表意见。', advice: '三思而后言。尤其在职场和重要场合，少说多做。远离是非之地，独善其身，等待运势回升。' },
+  { level: 'bad', label: '下签', poem: '近水楼台先得月\n向阳花木易为春', interpretation: '<b>看似有利实则不然。</b>你所处的位置虽然有表面的优势，但这可能只是虚幻的假象。<b>不要被表象迷惑</b>，更要看透本质。', advice: '仔细审视你当前的选择和立场。有些看起来很好的机会可能暗藏陷阱。多听听真心朋友的忠告。' },
+
+  // 下下签 (Terrible) - 3
+  { level: 'terrible', label: '下下签', poem: '运蹇时乖莫强求\n龙困浅滩暂低头', interpretation: '<b>龙困浅滩，时运最低。</b>这不是你能力的问题，纯粹是时运不佳。此签提醒你——<b>有些事不是努力就有用</b>，顺势耐心等待。', advice: '暂停进攻，全面防守。保住现有资源是第一要务。相信风水轮流转，蛰伏是为了更好的崛起。' },
+  { level: 'terrible', label: '下下签', poem: '南辕北辙空费力\n逆水行舟枉劳心', interpretation: '<b>方向不对，再努力也白费。</b>你可能正在错误的方向上投入大量精力。此签严重提醒你——<b>该回头了</b>，换个方向重新出发。', advice: '勇敢承认自己的判断失误并不可耻。及时止损是最明智的选择。把精力放在真正值得的事情上。' },
+  { level: 'terrible', label: '下下签', poem: '镜花水月终虚幻\n竹篮打水一场空', interpretation: '<b>镜花水月，一切皆空。</b>你所追求的可能只是虚幻泡影。此签暗示你追逐的东西可能根本不存在，或<b>不值得你如此投入</b>。', advice: '认真问自己：我到底在追什么？它是否真的值得？放下执念，你可能会发现生活中还有更珍贵的东西。' },
+];
+
+const TAROT_CARDS = [
+  { number: 'I', name: '魔术师', emoji: '🎩', desc: '创造力与自信。你拥有实现目标所需的一切资源，关键在于<b>主动出击</b>。新的机会正在靠近。' },
+  { number: 'II', name: '女祭司', emoji: '🌙', desc: '直觉与潜意识。你内心的声音知道答案。<b>相信直觉</b>，有些事不用追问，静待花开。' },
+  { number: 'III', name: '女皇', emoji: '👑', desc: '丰饶与滋养。一个创造与收获的时期。<b>温柔的力量</b>比强硬更有用，用心去关怀身边的一切。' },
+  { number: 'IV', name: '皇帝', emoji: '🏰', desc: '权威与秩序。你需要<b>掌控局面</b>，建立规则。这是发挥领导力的时刻，果断做决定。' },
+  { number: 'V', name: '教皇', emoji: '📿', desc: '智慧与指引。向有经验的人请教，或者<b>遵循传统</b>的路径。有些答案在经典之中。' },
+  { number: 'VI', name: '恋人', emoji: '💕', desc: '选择与和谐。你可能面临重要的<b>人生抉择</b>。听从内心的声音，选择让你真正快乐的方向。' },
+  { number: 'VII', name: '战车', emoji: '⚔️', desc: '胜利与决心。你正驶向成功，<b>意志力</b>将带你穿越障碍。保持专注，别被干扰分散精力。' },
+  { number: 'VIII', name: '力量', emoji: '🦁', desc: '勇气与坚韧。真正的力量并非暴力，而是<b>温柔的坚持</b>。你有足够的内在力量去面对一切。' },
+  { number: 'IX', name: '隐士', emoji: '🏮', desc: '内省与独处。暂时退一步，<b>在安静中寻找答案</b>。孤独是智慧的朋友，别害怕独处。' },
+  { number: 'X', name: '命运之轮', emoji: '🎡', desc: '转变与循环。命运之轮正在转动，<b>好运即将到来</b>。拥抱变化，这是你转运的开始。' },
+  { number: 'XI', name: '正义', emoji: '⚖️', desc: '公平与真相。事情会有公正的结果。<b>诚实面对自己</b>，你的努力不会被辜负。因果自有报。' },
+  { number: 'XII', name: '倒吊人', emoji: '🙃', desc: '换个角度看世界。暂时的停顿是为了更好的出发。<b>放手和等待</b>���时是最好的行动。' },
+  { number: 'XIII', name: '死神', emoji: '💀', desc: '结束与新生。不必害怕，这不是终结，而是<b>全新开始的预兆</b>。旧的离开，新的才会到来。' },
+  { number: 'XIV', name: '节制', emoji: '🌊', desc: '平衡与调和。不偏激不极端，<b>找到中间地带</b>。适度的节奏才能走得长远。' },
+  { number: 'XV', name: '恶魔', emoji: '😈', desc: '欲望与束缚。你是否被什么东西困住了？<b>审视自己的执念</b>，那些枷锁其实是你自己戴上的。' },
+  { number: 'XVI', name: '高塔', emoji: '⚡', desc: '剧变与觉醒。看似是毁灭，实则是<b>打破虚假的安全感</b>。经历风暴后你会更强大。' },
+  { number: 'XVII', name: '星星', emoji: '⭐', desc: '希望与疗愈。不管经历了什么，都要相信<b>未来充满光明</b>。你正走在正确的方向上。' },
+  { number: 'XVIII', name: '月亮', emoji: '🌙', desc: '迷茫与恐惧。有些事情你看不清楚，但这只是暂时的。<b>相信你的直觉</b>，黑暗中也能找到路。' },
+  { number: 'XIX', name: '太阳', emoji: '☀️', desc: '喜悦与成功。这是一切都充满阳光的时期！<b>尽情享受</b>，你的努力终于开花结果。' },
+  { number: 'XX', name: '审判', emoji: '📯', desc: '觉醒与召唤。内心深处有个声音在召唤你。<b>是时候做出重大改变了</b>，响应命运的号角。' },
+  { number: 'XXI', name: '世界', emoji: '🌍', desc: '圆满与完成。一个重要的旅程已经完成。<b>庆祝你的成就</b>，同时准备迎接下一个篇章。' },
+  { number: '0', name: '愚者', emoji: '🎒', desc: '新的冒险。你站在旅程的起点，充满无限可能。<b>勇敢迈出第一步</b>，前路虽然未知但充满惊喜。' },
+];
+
+const MOON_RESULTS = [
+  { blocks: 'flat-flat', name: '圣筊', desc: '<b>神明应允，心想事成。</b>你所祈求之事将得神明庇佑，可以放心去做。这是最好的结果，大吉大利。', level: 'excellent' },
+  { blocks: 'round-round', name: '怒筊', desc: '<b>神明不悦，此事不妥。</b>你问的这件事可能时机不对，或方向有误。建议重新思考，暂缓行动。', level: 'terrible' },
+  { blocks: 'flat-round', name: '笑筊', desc: '<b>神明在笑，尚无定论。</b>事情尚不明朗，需要你再等待。也可能你的心意不够诚恳，或问题还不够明确。', level: 'medium' },
+];
+
+/* ===== State ===== */
+let currentTab = 'qiuchen';
+let isDrawing = false;
+
+/* ===== Particles ===== */
+function createParticles() {
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = [];
+  for (let i = 0; i < 40; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 2 + 0.5,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      opacity: Math.random() * 0.5 + 0.1,
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(201,169,110,${p.opacity})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+createParticles();
+
+/* ===== Tab Switching ===== */
+const tabBtns = document.querySelectorAll('.tab-btn');
+const viewInit = document.getElementById('viewInit');
+const viewLoading = document.getElementById('viewLoading');
+const viewResult = document.getElementById('viewResult');
+const btnDraw = document.getElementById('btnDraw');
+const mainCard = document.getElementById('mainCard');
+
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (isDrawing) return;
+    tabBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.dataset.tab;
+    resetView();
+  });
+});
+
+function resetView() {
+  viewInit.style.display = 'flex';
+  viewInit.style.flexDirection = 'column';
+  viewInit.style.alignItems = 'center';
+  viewLoading.style.display = 'none';
+  viewResult.style.display = 'none';
+  viewResult.innerHTML = '';
+
+  btnDraw.style.display = '';
+  btnDraw.textContent = currentTab === 'tarot' ? '抽 一 张 牌' : currentTab === 'zhijiao' ? '掷 筊' : '开 始 占 卜';
+
+  // Update init icon per tab
+  const icon = viewInit.querySelector('.card-icon');
+  const title = viewInit.querySelector('.card-title');
+  const desc = viewInit.querySelector('.card-desc');
+  const descTexts = {
+    qiuchen: '静下心来，想一个你关心的问题。<br>默念三遍，然后摇动签筒。',
+    zhijiao: '双手合十，默念心中所问。<br>诚心祈求，然后将筊抛向空中。',
+    tarot: '深呼吸，放松身心。<br>默念你的问题，然后抽取一张塔罗牌。',
+  };
+  const icons = { qiuchen: '🏮', zhijiao: '🙏', tarot: '🔮' };
+  const titles = { qiuchen: '观音灵签', zhijiao: '掷筊问卜', tarot: '塔罗指引' };
+
+  icon.textContent = icons[currentTab] || '🏮';
+  title.textContent = titles[currentTab] || '观音灵签';
+  desc.innerHTML = descTexts[currentTab] || descTexts.qiuchen;
+}
+
+/* ===== Draw Button ===== */
+btnDraw.addEventListener('click', () => {
+  if (isDrawing) return;
+  isDrawing = true;
+
+  // Loading
+  viewInit.style.display = 'none';
+  viewResult.style.display = 'none';
+  viewResult.innerHTML = '';
+  viewLoading.style.display = 'flex';
+  viewLoading.style.flexDirection = 'column';
+  viewLoading.style.alignItems = 'center';
+
+  const duration = 1500 + Math.random() * 1000;
+
+  setTimeout(() => {
+    viewLoading.style.display = 'none';
+    viewResult.style.display = 'block';
+
+    switch (currentTab) {
+      case 'qiuchen':  drawFortuneStick(); break;
+      case 'zhijiao':  drawMoonBlocks(); break;
+      case 'tarot':    drawTarot(); break;
+    }
+
+    isDrawing = false;
+  }, duration);
+});
+
+/* ===== Fortune Stick (求签) ===== */
+function drawFortuneStick() {
+  const fortune = FORTUNES[Math.floor(Math.random() * FORTUNES.length)];
+  const stickNum = Math.floor(Math.random() * 100) + 1;
+  const badgeClass = `badge-${fortune.level}`;
+
+  viewResult.innerHTML = `
+    <div class="result-card" style="display:flex;flex-direction:column;align-items:center;">
+      <div class="drawn-stick">
+        <div class="stick-number">${stickNum}</div>
+      </div>
+      <span class="result-badge ${badgeClass}">${fortune.label}</span>
+      <div class="result-poem">${fortune.poem.replace(/\n/g, '<br>')}</div>
+      <div class="result-interpretation">${fortune.interpretation}</div>
+      <div class="result-advice">💡 ${fortune.advice}</div>
+      <button class="btn" onclick="redraw()">再 求 一 签</button>
+    </div>
+  `;
+}
+
+/* ===== Moon Blocks (掷筊) ===== */
+function drawMoonBlocks() {
+  const result = MOON_RESULTS[Math.floor(Math.random() * MOON_RESULTS.length)];
+  const badgeClass = `badge-${result.level}`;
+
+  const block1Class = result.blocks === 'flat-flat' ? 'flat' : result.blocks === 'round-round' ? 'round' : 'flat';
+  const block2Class = result.blocks === 'flat-flat' ? 'flat' : result.blocks === 'round-round' ? 'round' : 'round';
+
+  viewResult.innerHTML = `
+    <div class="result-card" style="display:flex;flex-direction:column;align-items:center;">
+      <div class="moon-blocks">
+        <div class="moon-block ${block1Class}"></div>
+        <div class="moon-block ${block2Class}"></div>
+      </div>
+      <span class="result-badge ${badgeClass}">${result.name}</span>
+      <div class="result-interpretation">${result.desc}</div>
+      <button class="btn" onclick="redraw()">再 掷 一 次</button>
+    </div>
+  `;
+}
+
+/* ===== Tarot ===== */
+function drawTarot() {
+  const card = TAROT_CARDS[Math.floor(Math.random() * TAROT_CARDS.length)];
+
+  viewResult.innerHTML = `
+    <div class="result-card" style="display:flex;flex-direction:column;align-items:center;">
+      <div class="tarot-card revealed" style="width:100px;height:150px;cursor:default;font-size:2.8rem;">${card.emoji}</div>
+      <div style="margin-top:12px;color:var(--gold-light);letter-spacing:2px;font-size:0.9rem;">${card.number} - ${card.name}</div>
+      <div class="result-interpretation" style="margin-top:16px;">${card.desc}</div>
+      <button class="btn" onclick="redraw()">再 抽 一 张</button>
+    </div>
+  `;
+}
+
+function redraw() {
+  if (isDrawing) return;
+  isDrawing = true;
+  const loadingEl = document.getElementById('viewLoading');
+  viewResult.style.display = 'none';
+  loadingEl.style.display = 'flex';
+  loadingEl.style.flexDirection = 'column';
+  loadingEl.style.alignItems = 'center';
+
+  setTimeout(() => {
+    loadingEl.style.display = 'none';
+    viewResult.style.display = 'block';
+    switch (currentTab) {
+      case 'qiuchen': drawFortuneStick(); break;
+      case 'zhijiao': drawMoonBlocks(); break;
+      case 'tarot':   drawTarot(); break;
+    }
+    isDrawing = false;
+  }, 1200);
+}
+
+// Initial reset
+resetView();
+</script>
+</body>
+</html>

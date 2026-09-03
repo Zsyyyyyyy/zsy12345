@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="FCfSmwV0L4nEqDN7kVGAS7">
+<head data-page-node-id="TGeoeXTtsODSnBDYzMl1cF">
+  <meta charset="UTF-8" data-page-node-id="jQchy2FsizbBUvxWA0dv3a">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="u8q9QELit0jxcTpXk2YvC3">
+  <title>zsy12345 · 工具箱</title>
+  <style>
+    *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+      padding: 24px 16px;
+    }
+    .terminal {
+      width: 420px;
+      max-width: 100%;
+      background: #0d0d0d;
+      border-radius: 10px;
+      border: 1px solid #262626;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+    }
+    .titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 16px;
+      background: #151515;
+      border-bottom: 1px solid #262626;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f56; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #27c93f; }
+    .title { margin-left: 12px; font-size: 14px; color: #666; }
+
+    .content { padding: 24px 22px 28px; }
+    h2 {
+      font-size: 18px;
+      color: #7ee787;
+      font-weight: normal;
+      margin-bottom: 6px;
+    }
+    .sub {
+      font-size: 12px;
+      color: #484f58;
+      margin-bottom: 20px;
+    }
+    .content p { margin-bottom: 14px; }
+    .content label {
+      display: block;
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 6px;
+    }
+    .content input[type="text"],
+    .content input[type="password"],
+    .content input[type="email"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      padding: 9px 12px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .content input:focus { outline: none; border-color: #58a6ff; }
+    .helptext {
+      display: block;
+      font-size: 11px;
+      color: #484f58;
+      margin: 4px 0 12px;
+      list-style: none;
+    }
+    .btn {
+      width: 100%;
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: #fff;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 6px;
+    }
+    .btn:hover { background: #2ea043; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .links {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #8b949e;
+      text-align: center;
+    }
+    .links a { color: #79c0ff; text-decoration: none; }
+    .links a:hover { text-decoration: underline; }
+
+    /* 以下为交互扩展 */
+    .view.hidden { display: none; }
+    #flash {
+      list-style: none;
+      font-size: 12px;
+      margin: 4px 0 8px;
+      padding: 0;
+      display: none;
+    }
+    #flash.error { color: #ff7b72; display: block; }
+    #flash.success { color: #7ee787; display: block; }
+    .kv { font-size: 13px; color: #c9d1d9; margin-bottom: 8px; }
+    .kv b { color: #8b949e; font-weight: normal; }
+    .token-box {
+      margin: 10px 0 14px;
+      padding: 10px 12px;
+      background: #111;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #79c0ff;
+      word-break: break-all;
+      line-height: 1.6;
+    }
+    .copy {
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .copy:hover { border-color: #58a6ff; color: #c9d1d9; }
+  </style>
+</head>
+<body data-page-node-id="HuVmx6LSYOb8Y60DhxuAJ6">
+  <div class="terminal" data-page-node-id="ybAnxwVNk7CV737iXvSI8U">
+    <div class="titlebar" data-page-node-id="JP12SsHzGQvQCqk8HUDNW0">
+      <span class="dot red" data-page-node-id="DOavvURv0eatagiN27JGRm"></span>
+      <span class="dot yellow" data-page-node-id="xi8VpVBXIl2nKhfSzYSeDm"></span>
+      <span class="dot green" data-page-node-id="Wgd8bxmUksKHN5DVTZUNmJ"></span>
+      <span class="title" id="bar-title" data-page-node-id="r1rrBhb9nJ1vhCf9FkRgnR">zsy12345 — login</span>
+    </div>
+    <div class="content" data-page-node-id="N88fP8AdosTVWJHKTVrB7h">
+
+      <!-- 登录视图 -->
+      <div class="view" id="login-view" data-page-node-id="OJvuLV6kMAmzDnbVEQ1pfc">
+        <h2 data-page-node-id="hoFJo1OfEgQA360ya36HmF">登录</h2>
+        <div class="sub" data-page-node-id="Y4e8RgTTABJi0Hir5dgNaw">$ ssh zsy@tools</div>
+        <ul id="flash" data-page-node-id="G06EdlnJYpEJ4HSQXHzso5"></ul>
+        <p data-page-node-id="U7o2rsb1brL9PanVhGSZUt">
+          <label for="login_username" data-page-node-id="cxBlK0Q6mqjcnJAu82kjww">用户名</label>
+          <input type="text" name="username" id="login_username" autofocus required autocomplete="username" data-page-node-id="aMO2CJGQgRinnMCrm7rWpB">
+        </p>
+        <p data-page-node-id="DOpbMcSGnbWS52iPsSlkND">
+          <label for="login_password" data-page-node-id="QMMuPRkdsk3a6eGvUajtIG">密码</label>
+          <input type="password" name="password" id="login_password" required autocomplete="current-password" data-page-node-id="1edVfEaOgZzIahdck19KGV">
+        </p>
+        <button type="submit" class="btn" id="login_btn" onclick="doLogin()" data-page-node-id="dIvIkyQVAqQGMfyHGWsbiM">登录</button>
+        <div class="links" data-page-node-id="t8lVZ2hsUmcRSO9ra90J4x">没有账号？<a href="#" onclick="goRegister()" data-page-node-id="qNuJ1ws0pung4qt9H3tRxB">注册一个</a></div>
+      </div>
+
+      <!-- 注册视图 -->
+      <div class="view hidden" id="register-view" data-page-node-id="3UbdQjSjCHCqhTHvAB6F2j">
+        <h2 data-page-node-id="5dKknGXGkvR7DaiehLwFyM">注册</h2>
+        <div class="sub" data-page-node-id="sZfMEsMsLwAj1kdVOh1SgW">$ ssh zsy@tools — register</div>
+        <ul id="flash2" data-page-node-id="mRQqtDJdoD7E9E2ZtrIuMq"></ul>
+        <p data-page-node-id="MFW5aWogp5uqA24GBs5aWm">
+          <label for="reg_username" data-page-node-id="EZvLjBSrmQqWjnCzVJyG04">用户名</label>
+          <input type="text" name="username" id="reg_username" autocomplete="username" data-page-node-id="BYKv2dFliiwVIVnF9S8NkR">
+        </p>
+        <p data-page-node-id="ch9bSHUzV8F0feycuPDQ2Z">
+          <label for="reg_email" data-page-node-id="NVMAvnIpONJVZYlccYUtyc">邮箱</label>
+          <input type="email" name="email" id="reg_email" autocomplete="email" data-page-node-id="y97uATZyupFMFetQeawTZv">
+        </p>
+        <p data-page-node-id="XK7lRBXbGZxpEWCKcIC2XN">
+          <label for="reg_password" data-page-node-id="VotnYRxALrDBoXo1p0e3WC">密码</label>
+          <input type="password" name="password" id="reg_password" autocomplete="new-password" data-page-node-id="gzNjuInyWiyuAkXh1WDIvy">
+          <span class="helptext" data-page-node-id="t4ODCXZIpDjdQYuTua44zv">至少 6 位</span>
+        </p>
+        <p data-page-node-id="oIFkDTlpsyHdKENAoV7Pek">
+          <label for="reg_confirm" data-page-node-id="hM7KeFWLWBgxqGxzK0thbc">确认密码</label>
+          <input type="password" name="confirm" id="reg_confirm" autocomplete="new-password" data-page-node-id="7pmBXB5S4LfqibAKnzyQnU">
+        </p>
+        <button type="submit" class="btn" id="reg_btn" onclick="doRegister()" data-page-node-id="Nd3uxBDG4qmnZtiRbgaHwt">注册</button>
+        <div class="links" data-page-node-id="Up3PMpEUrtEblUOHuiEu6e">已有账号？<a href="#" onclick="goLogin()" data-page-node-id="UGEfTpl1qmYxCHm3uxkKd0">去登录</a></div>
+      </div>
+
+      <!-- 已登录视图 -->
+      <div class="view hidden" id="me-view" data-page-node-id="MqTGQoMyA6wGtXZDsDtNZn">
+        <h2 data-page-node-id="fyqm7sjMupWSCNgSmfFMwf">已登录</h2>
+        <div class="sub" data-page-node-id="lT6my6B1ACiqytBK58S9kU">$ whoami</div>
+        <div class="kv" data-page-node-id="3ZBA1CmKK3ExVz12751CTj"><b data-page-node-id="M8EEGzcZz7MkP9JLkBtneT">用户名　</b><span id="me_username" data-page-node-id="7uwUAy18ln8y4IGFxRD3Y9"></span></div>
+        <div class="kv" data-page-node-id="8RUNpOht5MA6e6x9VFlnim"><b data-page-node-id="G0XdGRQBcY3TZudLpN5S55">邮箱　　</b><span id="me_email" data-page-node-id="CfkTNrWl7vaDy6xnhzHZil"></span></div>
+        <div class="kv" data-page-node-id="B4uZYvKSkbxORgBr18Mvxc"><b data-page-node-id="svcEOD2KGLX9YSWkqnNjqI">用户 ID</b><span id="me_id" data-page-node-id="5EQoy8kci2xiJWQmLkM3XK"></span></div>
+        <div class="kv" data-page-node-id="hiNOv0NW5S1WTl3qETuCFR"><b data-page-node-id="Bn9m2gyBJnWO3BEAEBGzGX">注册时间</b><span id="me_created" data-page-node-id="AE7V2bppkrf7lzfs9xmwSA"></span></div>
+        <label style="margin-top:6px;" data-page-node-id="DgSyujZbOldvCcZbSHo6MA">access_token</label>
+        <div class="token-box" id="token_box" data-page-node-id="u6JrDYqekdmLoKgEU2T7zM"></div>
+        <button class="copy" onclick="copyToken()" data-page-node-id="O7zrCLGgR7N7gL1EpC5INM">复制 token</button>
+        <button type="button" class="btn" onclick="logout()" style="margin-top:12px;" data-page-node-id="Bhbli5TilDSY4gX1JagdHo">退出登录</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // 后端接口地址：同源部署时留空；前后端分离时改成后端地址，如 'http://127.0.0.1:8000'
+    const API_BASE = '';
+
+    const $ = (id) => document.getElementById(id);
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    function flash(msg, type) {
+      // 每个视图有各自的 flash 容器，统一刷新当前可见的
+      document.querySelectorAll('#flash, #flash2').forEach(el => {
+        el.innerHTML = msg ? '<li>' + escapeHtml(msg) + '</li>' : '';
+        el.className = type || '';
+        el.style.display = msg ? 'block' : 'none';
+      });
+    }
+
+    function show(viewId) {
+      document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+      $(viewId).classList.remove('hidden');
+      $('bar-title').textContent =
+        viewId === 'me-view' ? 'zsy12345 — session' :
+        viewId === 'register-view' ? 'zsy12345 — register' : 'zsy12345 — login';
+    }
+
+    function goLogin() { flash('', ''); show('login-view'); }
+    function goRegister() { flash('', ''); show('register-view'); }
+
+    function setLoading(btnId, loading) {
+      const btn = $(btnId);
+      if (loading) {
+        btn.dataset.orig = btn.textContent;
+        btn.textContent = '…';
+        btn.disabled = true;
+      } else {
+        btn.textContent = btn.dataset.orig || btn.textContent;
+        btn.disabled = false;
+      }
+    }
+
+    async function api(path, body) {
+      const res = await fetch(API_BASE + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        let msg = data.detail;
+        if (Array.isArray(msg)) msg = msg.map(m => m.msg).join('; ');
+        throw new Error(msg || ('请求失败 ' + res.status));
+      }
+      return data;
+    }
+
+    async function doLogin() {
+      flash('', '');
+      const username = $('login_username').value.trim();
+      const password = $('login_password').value;
+      if (!username || !password) { flash('请输入用户名和密码', 'error'); return; }
+      setLoading('login_btn', true);
+      try {
+        const data = await api('/login', { username, password });
+        localStorage.setItem('token', data.access_token);
+        window.location.href = '/';
+      } catch (e) {
+        flash(e.message, 'error');
+      } finally {
+        setLoading('login_btn', false);
+      }
+    }
+
+    async function doRegister() {
+      flash('', '');
+      const username = $('reg_username').value.trim();
+      const email = $('reg_email').value.trim();
+      const password = $('reg_password').value;
+      const confirm = $('reg_confirm').value;
+      if (!username || !email || !password) { flash('请填写完整', 'error'); return; }
+      if (password !== confirm) { flash('两次密码不一致', 'error'); return; }
+      setLoading('reg_btn', true);
+      try {
+        await api('/register', { username, email, password });
+        $('login_username').value = username;
+        $('login_password').value = '';
+        flash('注册成功，请登录', 'success');
+        show('login-view');
+      } catch (e) {
+        flash(e.message, 'error');
+      } finally {
+        setLoading('reg_btn', false);
+      }
+    }
+
+    async function renderMe() {
+      const token = localStorage.getItem('token');
+      if (!token) { show('login-view'); return; }
+      try {
+        const res = await fetch(API_BASE + '/me', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) throw new Error();
+        const user = await res.json();
+        $('me_username').textContent = user.username;
+        $('me_email').textContent = user.email;
+        $('me_id').textContent = '#' + user.id;
+        $('me_created').textContent = (user.created_at || '').replace('T', ' ').slice(0, 19);
+        $('token_box').textContent = token;
+        show('me-view');
+      } catch (e) {
+        logout();
+      }
+    }
+
+    function copyToken() {
+      navigator.clipboard.writeText(localStorage.getItem('token') || '').then(() => {
+        flash('已复制到剪贴板', 'success');
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      flash('', '');
+      show('login-view');
+    }
+
+    // 登录表单回车提交
+    $('login_password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    // 页面加载：已有 token 则自动恢复登录态
+    renderMe();
+
+    // 从首页「注册」按钮跳转 /login#register 时，自动切到注册视图
+    if (location.hash === '#register' && !localStorage.getItem('token')) {
+      show('register-view');
+    }
+  </script>
+</body>
+</html>

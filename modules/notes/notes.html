@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>笔记本</title>
+    <script src="../lib/marked.min.js"></script>
+    <script src="../lib/xlsx.full.min.js"></script>
+    <script src="notes-data.js?v=1788333767002"></script>
+    <style>
+        *, *::before, *::after { font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
+        :root {
+            --bg: #0a0a0a; --card-bg: #111; --card-border: #262626;
+            --text: #d4d4d4; --text-secondary: #888;
+            --accent: #58a6ff; --accent-hover: #79c0ff;
+            --input-bg: #0a0a0a; --input-border: #333;
+            --success: #3fb950; --danger: #f85149; --warn: #d2991d;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000; color: var(--text);
+            min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
+            padding: 24px 20px;
+        }
+
+        .note-app { width: 100%; max-width: 780px; margin-top: 16px; }
+
+        .term {
+            width: 100%; background: #0d0d0d; border: 1px solid #262626;
+            border-radius: 10px; overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+        }
+        .term-bar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 13px 16px; background: #151515;
+            border-bottom: 1px solid #262626;
+        }
+        .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .term-dot.r { background: #ff5f56; }
+        .term-dot.y { background: #ffbd2e; }
+        .term-dot.g { background: #27c93f; }
+        .term-label { margin-left: 10px; font-size: 13px; color: #555; }
+
+        .container { padding: 26px 30px 30px; }
+
+        .back-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 13px; margin-bottom: 18px; transition: color 0.2s; cursor: pointer;
+        }
+        .back-link:hover { color: var(--text); }
+
+        /* Board header */
+        .board-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; flex-wrap: wrap; }
+        .board-head h1 { font-size: 22px; font-weight: 500; color: #e8e8e8; letter-spacing: 1px; }
+        .board-count { font-size: 13px; color: #555; margin-right: auto; }
+        .search-box { position: relative; }
+        .search-box input {
+            width: 190px; padding: 9px 12px 9px 32px;
+            background: var(--input-bg); color: var(--text);
+            border: 1px solid var(--input-border); border-radius: 6px;
+            font-size: 13px; outline: none; transition: border-color 0.2s;
+        }
+        .search-box input:focus { border-color: #444; }
+        .search-box::before {
+            content: "⌕"; position: absolute; left: 11px; top: 50%;
+            transform: translateY(-50%); color: #555; font-size: 15px;
+        }
+        .ro-badge {
+            font-size: 11px; color: var(--warn); background: rgba(210,153,29,0.1);
+            border: 1px solid rgba(210,153,29,0.3); padding: 3px 9px; border-radius: 10px;
+        }
+
+        .hint {
+            font-size: 12px; color: #4a4a4a; margin-bottom: 4px;
+            padding-bottom: 16px;
+        }
+        .hint code { color: #6a6a6a; background: #161616; padding: 1px 6px; border-radius: 4px; }
+
+        /* Region tabs */
+        .region-tabs {
+            display: flex; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;
+            padding-bottom: 16px; border-bottom: 1px solid #1c1c1c;
+        }
+        .region-tab {
+            padding: 6px 16px; border-radius: 20px; font-size: 13px; cursor: pointer;
+            background: #151515; color: #777; border: 1px solid transparent; transition: all 0.2s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .region-tab:hover { color: #aaa; border-color: #333; }
+        .region-tab.active { background: rgba(88,166,255,0.12); color: var(--accent); border-color: rgba(88,166,255,0.35); }
+        .region-tab .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+        /* Thread list */
+        .thread { display: block; text-decoration: none; border-bottom: 1px solid #161616; cursor: pointer; transition: background 0.15s; }
+        .thread:last-child { border-bottom: none; }
+        .thread-inner { display: flex; align-items: center; gap: 18px; padding: 18px 10px; }
+        .thread:hover { background: #121212; }
+        .thread:hover .thread-title { color: var(--accent-hover); }
+        .thread:hover .thread-arrow { transform: translateX(4px); color: var(--accent); }
+        .thread-num { font-size: 13px; color: #3a3a3a; min-width: 38px; text-align: right; flex-shrink: 0; }
+        .thread-main { flex: 1; min-width: 0; }
+        .thread-title {
+            font-size: 16px; font-weight: 500; color: #e0e0e0;
+            margin-bottom: 6px; word-break: break-word; transition: color 0.15s; line-height: 1.4;
+        }
+        .thread-preview {
+            font-size: 13px; color: #666; line-height: 1.5;
+            display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+            overflow: hidden; word-break: break-word; margin-bottom: 8px;
+        }
+        .thread-meta { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #4a4a4a; flex-wrap: wrap; }
+        .region-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 9px; border-radius: 10px; font-size: 11px; flex-shrink: 0;
+        }
+        .thread-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+        .thread-date { font-size: 12px; color: #4a4a4a; }
+        .thread-arrow { font-size: 20px; color: #333; transition: all 0.15s; line-height: 1; }
+
+        .empty { text-align: center; padding: 60px 20px; color: #3d3d3d; }
+        .empty-icon { font-size: 40px; margin-bottom: 14px; }
+        .empty-text { font-size: 14px; line-height: 1.8; }
+        .empty-text code { color: #6a6a6a; background: #161616; padding: 1px 6px; border-radius: 4px; }
+
+        /* Read view */
+        #readView { display: none; }
+        .post-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+        .post-title { font-size: 24px; font-weight: 600; color: #f0f0f0; line-height: 1.35; word-break: break-word; flex: 1; }
+        .post-head .region-badge { margin-top: 7px; }
+        .post-meta {
+            display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+            font-size: 12px; color: #555; padding-bottom: 18px; margin-bottom: 24px;
+            border-bottom: 1px solid #1c1c1c;
+        }
+        .post-meta .sep { color: #2a2a2a; }
+        .post-meta .fname { color: #3f3f3f; }
+
+        /* 阅读视图操作按钮（复制） */
+        .post-head-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .copy-btn {
+            padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit;
+            background: rgba(88,166,255,0.12); color: var(--accent);
+            border: 1px solid rgba(88,166,255,0.3); border-radius: 6px;
+            transition: all .15s; white-space: nowrap;
+        }
+        .copy-btn:hover { background: rgba(88,166,255,0.22); color: var(--accent-hover); }
+        .copy-btn:active { transform: translateY(1px); }
+
+        /* 复制提示 toast */
+        .toast {
+            position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%) translateY(16px);
+            background: #1a1a1a; border: 1px solid #333; color: #d4d4d4;
+            padding: 10px 18px; border-radius: 8px; font-size: 13px;
+            opacity: 0; pointer-events: none; transition: all .22s; z-index: 600;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.ok { border-color: rgba(63,185,80,0.5); color: #7ee787; }
+
+        /* Markdown body */
+        .md-body { font-size: 15px; line-height: 1.85; color: #c4c4c4; word-break: break-word; }
+        .md-body > *:first-child { margin-top: 0; }
+        .md-body h1, .md-body h2, .md-body h3, .md-body h4 { color: #ededed; line-height: 1.4; margin: 26px 0 12px; font-weight: 600; }
+        .md-body h1 { font-size: 21px; padding-bottom: 8px; border-bottom: 1px solid #1c1c1c; }
+        .md-body h2 { font-size: 18px; }
+        .md-body h3 { font-size: 16px; }
+        .md-body h4 { font-size: 15px; }
+        .md-body p { margin: 12px 0; }
+        .md-body a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(88,166,255,0.3); }
+        .md-body a:hover { color: var(--accent-hover); }
+        .md-body strong { color: #e8e8e8; font-weight: 600; }
+        .md-body em { color: #d0d0d0; }
+        .md-body ul, .md-body ol { margin: 12px 0; padding-left: 26px; }
+        .md-body li { margin: 5px 0; }
+        .md-body li::marker { color: #555; }
+        .md-body code {
+            background: #1a1a1a; color: #a5d6ff; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.9em; border: 1px solid #232323;
+        }
+        .md-body pre {
+            background: #111; border: 1px solid #222; border-radius: 8px;
+            padding: 16px 18px; overflow-x: auto; margin: 16px 0;
+        }
+        .md-body pre code { background: none; border: none; padding: 0; color: #c9d1d9; font-size: 13px; line-height: 1.6; }
+        .md-body blockquote { border-left: 3px solid #2c2c2c; padding: 4px 0 4px 16px; margin: 16px 0; color: #8a8a8a; }
+        .md-body blockquote p { margin: 6px 0; }
+        .md-body hr { border: none; border-top: 1px solid #222; margin: 24px 0; }
+        .md-body img { max-width: 100%; border-radius: 8px; }
+        .md-body table { border-collapse: collapse; margin: 16px 0; width: 100%; font-size: 14px; }
+        .md-body th, .md-body td { border: 1px solid #262626; padding: 8px 12px; text-align: left; }
+        .md-body th { background: #161616; color: #ddd; }
+
+        /* Load error */
+        .load-err { text-align: center; padding: 50px 24px; }
+        .load-err .t { font-size: 16px; color: var(--warn); margin-bottom: 14px; }
+        .load-err .d { font-size: 13px; color: #666; line-height: 2; }
+        .load-err .cmd {
+            display: inline-block; margin-top: 14px; background: #111; border: 1px solid #262626;
+            padding: 10px 18px; border-radius: 8px; color: #7ee787; font-size: 14px;
+        }
+
+        @media (max-width: 640px) {
+            body { padding: 12px; }
+            .container { padding: 18px 16px 22px; }
+            .board-head h1 { font-size: 19px; }
+            .search-box input { width: 100%; }
+            .search-box { width: 100%; }
+            .thread-num, .thread-side { display: none; }
+            .post-title { font-size: 20px; }
+            .md-body { font-size: 14px; }
+            .post-head { flex-wrap: wrap; }
+            .post-head-right { margin-top: 8px; }
+        }
+
+        /* ===== Excel view ===== */
+        #excelView { display: none; }
+        .excel-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+        .excel-toolbar .btn {
+            padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit;
+            background: rgba(88,166,255,0.12); color: var(--accent);
+            border: 1px solid rgba(88,166,255,0.3); border-radius: 6px; transition: .15s;
+        }
+        .excel-toolbar .btn:hover { background: rgba(88,166,255,0.22); color: var(--accent-hover); }
+        .excel-toolbar .btn:active { transform: translateY(1px); }
+        .excel-toolbar .fname { font-size: 12px; color: var(--text-secondary); }
+        .excel-toolbar .hint { font-size: 12px; color: #4a4a4a; margin-left: auto; }
+        .sheet-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid #1c1c1c; }
+        .sheet-tab {
+            padding: 6px 14px; font-size: 13px; cursor: pointer; background: #151515; color: #888;
+            border: 1px solid transparent; border-radius: 6px; transition: .15s;
+        }
+        .sheet-tab:hover { color: #aaa; border-color: #333; }
+        .sheet-tab.active { background: rgba(88,166,255,0.12); color: var(--accent); border-color: rgba(88,166,255,0.35); }
+        .xls-table-wrap { margin-top: 14px; max-height: 60vh; overflow: auto; border: 1px solid var(--card-border); border-radius: 8px; }
+        table.xls { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; }
+        table.xls td {
+            border: 1px solid #262626; padding: 7px 10px; text-align: left; color: #c4c4c4; white-space: nowrap;
+        }
+        table.xls tr:first-child td {
+            background: #161616; color: #ddd; font-weight: 600; position: sticky; top: 0; z-index: 2;
+            border-bottom: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+<div class="note-app">
+    <div class="term">
+        <div class="term-bar">
+            <div class="term-dot r"></div>
+            <div class="term-dot y"></div>
+            <div class="term-dot g"></div>
+            <div class="term-label">notes — markdown</div>
+        </div>
+        <div class="container">
+            <a href="/" class="back-link">← cd ..</a>
+
+            <!-- List view -->
+            <div id="listView">
+                <div class="board-head">
+                    <h1>笔记本</h1>
+                    <span class="ro-badge">只读</span>
+                    <span class="board-count" id="boardCount"></span>
+                    <div class="search-box">
+                        <input id="searchInput" type="text" placeholder="搜索标题 / 内容...">
+                    </div>
+                </div>
+                <div class="hint">在 <code>data/&lt;地区&gt;/</code> 里编辑 <code>.md</code> 或放入 <code>.xlsx/.xls/.csv</code>，再运行 <code>node build-notes.js</code> 刷新即可</div>
+                <div class="region-tabs" id="regionTabs"></div>
+                <div id="threadList"></div>
+            </div>
+
+            <!-- Read view -->
+            <div id="readView">
+                <a class="back-link" onclick="backToList()">← 返回列表</a>
+                <div class="post-head">
+                    <h2 class="post-title" id="postTitle"></h2>
+                    <div class="post-head-right">
+                        <span class="region-badge" id="postBadge"></span>
+                        <button class="copy-btn" onclick="copyMd()">复制源码</button>
+                        <button class="copy-btn" onclick="copyText()">复制文本</button>
+                    </div>
+                </div>
+                <div class="post-meta" id="postMeta"></div>
+                <div class="md-body" id="postContent"></div>
+            </div>
+
+            <!-- Excel view -->
+            <div id="excelView">
+                <a class="back-link" onclick="backToList()">← 返回列表</a>
+                <div class="post-head">
+                    <h2 class="post-title" id="xlsxTitle"></h2>
+                    <div class="post-head-right">
+                        <span class="region-badge" id="xlsxBadge"></span>
+                    </div>
+                </div>
+                <div class="post-meta" id="xlsxMeta"></div>
+                <div class="excel-toolbar" style="margin-top:18px;">
+                    <span class="fname" id="xlsxFname">未选择文件</span>
+                    <span class="hint">支持 .xlsx / .xls / .csv，多 sheet 切换</span>
+                </div>
+                <div class="sheet-tabs" id="xlsxSheetTabs"></div>
+                <div class="xls-table-wrap" id="xlsxTableWrap"><div class="empty"><div class="empty-icon">📊</div><div class="empty-text">从列表选择 Excel 文件</div></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Copy toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+    'use strict';
+
+    var REGIONS = ['台湾', '泰国', '越南', '俄罗斯', 'files'];
+    var REGION_STYLE = {
+        '台湾':   { c: '#58a6ff', bg: 'rgba(88,166,255,0.12)' },
+        '泰国':   { c: '#3fb950', bg: 'rgba(63,185,80,0.12)' },
+        '越南':   { c: '#d2991d', bg: 'rgba(210,153,29,0.12)' },
+        '俄罗斯': { c: '#a371f7', bg: 'rgba(163,113,247,0.12)' },
+        'files':  { c: '#f85149', bg: 'rgba(248,81,73,0.12)' },
+        '其他':   { c: '#8b949e', bg: 'rgba(139,148,158,0.12)' }
+    };
+
+    var notes = [];
+    var currentRegion = 'all';
+    var searchQuery = '';
+    var readingIndex = null;
+
+    var $ = function(id) { return document.getElementById(id); };
+    marked.setOptions({ gfm: true, breaks: true });
+
+    function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function fmtDate(ts){ var d=new Date(ts),p=function(n){return String(n).padStart(2,'0');};
+        return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+    function fmtShort(ts){ var d=new Date(ts),p=function(n){return String(n).padStart(2,'0');};
+        return p(d.getMonth()+1)+'-'+p(d.getDate()); }
+    function pad(n,w){ var s=String(n); while(s.length<w) s='0'+s; return s; }
+
+    function regionBadge(region) {
+        var st = REGION_STYLE[region] || REGION_STYLE['其他'];
+        return '<span class="region-badge" style="background:' + st.bg + ';color:' + st.c + '">' + escHtml(region) + '</span>';
+    }
+    function regionDot(region) {
+        var st = REGION_STYLE[region] || REGION_STYLE['其他'];
+        return '<span class="dot" style="background:' + st.c + '"></span>';
+    }
+
+    function plainText(md){
+        return String(md)
+            .replace(/```[\s\S]*?```/g, ' ')
+            .replace(/`([^`]*)`/g, '$1')
+            .replace(/^#{1,6}\s+/gm, '')
+            .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+            .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/[*_~>#|-]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function getFiltered() {
+        var list = notes.slice();
+        if (currentRegion !== 'all') list = list.filter(function(n){ return n.region === currentRegion; });
+        if (searchQuery) {
+            var q = searchQuery.toLowerCase();
+            list = list.filter(function(n){
+                return n.title.toLowerCase().indexOf(q) !== -1 ||
+                       (n.content || '').toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        return list;
+    }
+
+    function renderTabs() {
+        var presentRegions = {};
+        notes.forEach(function(n){ presentRegions[n.region] = 1; });
+        var tabs = [{ key: 'all', label: '全部' }].concat(
+            REGIONS.filter(function(r){ return presentRegions[r]; }).map(function(r){ return { key: r, label: r }; })
+        );
+        var html = '';
+        tabs.forEach(function(t) {
+            var active = currentRegion === t.key ? ' active' : '';
+            var dot = t.key === 'all' ? '' : regionDot(t.key);
+            html += '<div class="region-tab' + active + '" data-region="' + t.key + '">' + dot + t.label + '</div>';
+        });
+        $('regionTabs').innerHTML = html;
+    }
+
+    function renderList() {
+        var list = getFiltered();
+        $('boardCount').textContent = (searchQuery || currentRegion !== 'all')
+            ? list.length + ' / ' + notes.length + ' 篇'
+            : notes.length + ' 篇';
+        var container = $('threadList');
+
+        if (list.length === 0) {
+            container.innerHTML = '<div class="empty"><div class="empty-icon">🗒</div><div class="empty-text">'
+                + (searchQuery ? '没有匹配的内容'
+                  : 'data/ 目录里还没有内容<br>新建 <code>.md</code> 或在 <code>data/files/</code> 放入 Excel 后运行 <code>node build-notes.js</code> 刷新')
+                + '</div></div>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < list.length; i++) {
+            var n = list[i];
+            var idx = notes.indexOf(n);
+            var isXlsx = n.type === 'xlsx';
+            var preview = isXlsx ? 'Excel 文件 · 点击打开' : plainText(n.content).substring(0, 70);
+            var click = isXlsx ? 'openXlsxNote(' + idx + ')' : 'openNote(' + idx + ')';
+            var sizeInfo = isXlsx ? '<span>Excel</span>' : '<span>约 ' + n.content.length + ' 字</span>';
+            var icon = isXlsx ? '📊 ' : '';
+            html += '<div class="thread" onclick="' + click + '">'
+                + '<div class="thread-inner">'
+                + '<div class="thread-num">#' + pad(list.length - i, 2) + '</div>'
+                + '<div class="thread-main">'
+                + '<div class="thread-title">' + icon + escHtml(n.title) + '</div>'
+                + '<div class="thread-preview">' + escHtml(preview || '（空）') + '</div>'
+                + '<div class="thread-meta">'
+                + regionBadge(n.region)
+                + '<span>' + fmtDate(n.updated) + '</span>'
+                + sizeInfo
+                + '</div></div>'
+                + '<div class="thread-side">'
+                + '<span class="thread-date">' + fmtShort(n.updated) + '</span>'
+                + '<span class="thread-arrow">›</span>'
+                + '</div></div></div>';
+        }
+        container.innerHTML = html;
+    }
+
+    window.openNote = function(idx) {
+        var n = notes[idx];
+        if (!n) return;
+        readingIndex = idx;
+        $('postTitle').textContent = n.title;
+        var badge = $('postBadge');
+        var st = REGION_STYLE[n.region] || REGION_STYLE['其他'];
+        badge.textContent = n.region;
+        badge.style.background = st.bg; badge.style.color = st.c;
+        var meta = '<span class="fname">' + escHtml(n.file) + '</span>';
+        meta += '<span class="sep">·</span>更新于 ' + fmtDate(n.updated);
+        if (Math.abs(n.created - n.updated) > 60000) meta += '<span class="sep">·</span>创建于 ' + fmtDate(n.created);
+        meta += '<span class="sep">·</span>共 ' + n.content.length + ' 字';
+        $('postMeta').innerHTML = meta;
+        $('postContent').innerHTML = marked.parse(n.content || '');
+        $('listView').style.display = 'none';
+        $('readView').style.display = 'block';
+        window.scrollTo(0, 0);
+    };
+
+    window.openXlsxNote = function(idx) {
+        var n = notes[idx];
+        if (!n) return;
+        readingIndex = idx;
+        $('xlsxTitle').textContent = n.title;
+        var badge = $('xlsxBadge');
+        var st = REGION_STYLE[n.region] || REGION_STYLE['其他'];
+        badge.textContent = n.region;
+        badge.style.background = st.bg; badge.style.color = st.c;
+        var meta = '<span class="fname">' + escHtml(n.file) + '</span>';
+        meta += '<span class="sep">·</span>更新于 ' + fmtDate(n.updated);
+        if (Math.abs(n.created - n.updated) > 60000) meta += '<span class="sep">·</span>创建于 ' + fmtDate(n.created);
+        $('xlsxMeta').innerHTML = meta;
+
+        $('listView').style.display = 'none';
+        $('readView').style.display = 'none';
+        $('excelView').style.display = 'block';
+        $('xlsxFname').textContent = '加载中…';
+        $('xlsxTableWrap').innerHTML = '<div class="empty">正在读取 ' + escHtml(n.file) + '…</div>';
+        fetch('data/' + n.file)
+            .then(function(res){
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.arrayBuffer();
+            })
+            .then(function(buf){
+                var wb = XLSX.read(new Uint8Array(buf), {type:'array'});
+                xlsxLoadWorkbook(wb, n.file.split('/').pop());
+            })
+            .catch(function(err){
+                $('xlsxFname').textContent = '加载失败';
+                $('xlsxTableWrap').innerHTML = '<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">无法读取文件：' + escHtml(err.message) + '<br>若通过 file:// 协议打开，请使用本地服务器访问。</div></div>';
+            });
+        window.scrollTo(0, 0);
+    };
+
+    window.backToList = function() {
+        readingIndex = null;
+        $('readView').style.display = 'none';
+        $('excelView').style.display = 'none';
+        $('listView').style.display = 'block';
+        renderList();
+    };
+
+    /* ===== Excel 查看器 ===== */
+    var xlsxCurrentWB = null;
+    function xlsxCellVal(ws, r, c){
+        var addr = XLSX.utils.encode_cell({r:r, c:c});
+        var cell = ws[addr];
+        if(!cell) return '';
+        if(cell.w !== undefined) return cell.w;
+        if(cell.v === undefined) return '';
+        return cell.v;
+    }
+    function xlsxRenderSheet(ws){
+        var ref = ws['!ref'];
+        if(!ref) return '<div class="empty">（空表）</div>';
+        var range = XLSX.utils.decode_range(ref);
+        var merges = ws['!merges'] || [];
+        var span = {}, covered = {};
+        merges.forEach(function(m){
+            span[m.s.r+'_'+m.s.c] = {rs:m.e.r-m.s.r+1, cs:m.e.c-m.s.c+1};
+            for(var r=m.s.r; r<=m.e.r; r++) for(var c=m.s.c; c<=m.e.c; c++) covered[r+'_'+c]=1;
+        });
+        var rows = '';
+        for(var r=range.s.r; r<=range.e.r; r++){
+            var tds = '';
+            for(var c=range.s.c; c<=range.e.c; c++){
+                var key = r+'_'+c;
+                if(covered[key] && !span[key]) continue;
+                var attr = '';
+                if(span[key]){
+                    if(span[key].rs>1) attr += ' rowspan="'+span[key].rs+'"';
+                    if(span[key].cs>1) attr += ' colspan="'+span[key].cs+'"';
+                }
+                tds += '<td'+attr+'>'+escHtml(xlsxCellVal(ws,r,c))+'</td>';
+            }
+            rows += '<tr>'+tds+'</tr>';
+        }
+        return '<table class="xls"><tbody>'+rows+'</tbody></table>';
+    }
+    function xlsxRenderTabs(){
+        var box = $('xlsxSheetTabs');
+        box.innerHTML = '';
+        xlsxCurrentWB.SheetNames.forEach(function(name, i){
+            var d = document.createElement('div');
+            d.className = 'sheet-tab' + (i===0?' active':'');
+            d.textContent = name;
+            d.onclick = function(){
+                document.querySelectorAll('.sheet-tab').forEach(function(x){x.classList.remove('active');});
+                d.classList.add('active');
+                $('xlsxTableWrap').innerHTML = xlsxRenderSheet(xlsxCurrentWB.Sheets[name]);
+            };
+            box.appendChild(d);
+        });
+    }
+    function xlsxLoadWorkbook(wb, fname){
+        xlsxCurrentWB = wb;
+        $('xlsxFname').textContent = fname;
+        xlsxRenderTabs();
+        $('xlsxTableWrap').innerHTML = xlsxRenderSheet(xlsxCurrentWB.Sheets[xlsxCurrentWB.SheetNames[0]]);
+    }
+    function xlsxShowError(msg){
+        $('xlsxTableWrap').innerHTML = '<div class="empty">'+escHtml(msg)+'</div>';
+    }
+
+    /* ===== 复制 ===== */
+    var toastTimer;
+    function toast(msg, ok) {
+        var t = $('toast');
+        t.textContent = msg;
+        t.className = 'show' + (ok ? ' ok' : '');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function(){ t.className = ''; }, 1700);
+    }
+    function fallbackCopy(text, okMsg) {
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            var ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            toast(ok ? okMsg : '复制失败，请手动选择', ok);
+        } catch (e) {
+            toast('复制失败，请手动选择文字', false);
+        }
+    }
+    function copyToClipboard(text, okMsg) {
+        if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function(){ toast(okMsg, true); })
+                .catch(function(){ fallbackCopy(text, okMsg); });
+        } else {
+            fallbackCopy(text, okMsg);
+        }
+    }
+    window.copyMd = function() {
+        var n = notes[readingIndex];
+        if (!n) { toast('没有可复制的内容', false); return; }
+        copyToClipboard(n.content || '', '已复制 Markdown 源码');
+    };
+    window.copyText = function() {
+        var el = $('postContent');
+        var txt = (el.innerText || el.textContent || '').trim();
+        if (!txt) { toast('没有可复制的内容', false); return; }
+        copyToClipboard(txt, '已复制纯文本');
+    };
+
+    var searchTimer;
+    $('searchInput').addEventListener('input', function(){
+        clearTimeout(searchTimer); var v = this.value;
+        searchTimer = setTimeout(function(){ searchQuery = v.trim(); renderList(); }, 200);
+    });
+
+    $('regionTabs').addEventListener('click', function(e){
+        var tab = e.target.closest('.region-tab'); if (!tab) return;
+        currentRegion = tab.dataset.region;
+        renderTabs(); renderList();
+    });
+
+    document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape' && readingIndex !== null) backToList();
+    });
+
+    /* ===== 加载笔记 ===== */
+    function showLoadError() {
+        $('listView').innerHTML =
+            '<div class="load-err">'
+            + '<div class="t">还没有笔记数据</div>'
+            + '<div class="d">先在项目目录运行一次下面的命令，把 data/ 里的 .md 打包成数据文件</div>'
+            + '<div class="cmd">node build-notes.js</div>'
+            + '<div class="d" style="margin-top:12px">以后每次改完笔记，重跑一次这个命令，刷新即可看到</div>'
+            + '</div>';
+    }
+
+    function loadNotes() {
+        if (window.NOTES_DATA && Array.isArray(window.NOTES_DATA)) {
+            notes = window.NOTES_DATA;
+            renderTabs(); renderList();
+        } else {
+            showLoadError();
+        }
+    }
+
+    /* ===== Init ===== */
+    loadNotes();
+})();
+</script>
+
+</body>
+</html>

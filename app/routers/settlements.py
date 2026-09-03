@@ -44,12 +44,20 @@ def settle_position(
     if multiplier is None:
         multiplier = pos.multiplier if pos.multiplier is not None else 1.0
 
+    # 方向：请求显式传入 > 持仓快照 > 默认做多
+    direction = (data.direction or getattr(pos, "direction", None) or "long").lower()
+    if direction not in ("long", "short"):
+        direction = "long"
+
     currency = data.currency or _infer_currency(pos.code)
-    pnl = (data.settle_price - pos.buy_price) * pos.lots * float(multiplier)
+    # 做多低买高卖、做空高卖低买，方向决定价差正负的取法
+    price_diff = (data.settle_price - pos.buy_price) if direction == "long" else (pos.buy_price - data.settle_price)
+    pnl = price_diff * pos.lots * float(multiplier)
 
     record = Settlement(
         user_id=user.id,
         code=pos.code,
+        direction=direction,
         name=data.name,
         buy_price=pos.buy_price,
         settle_price=data.settle_price,

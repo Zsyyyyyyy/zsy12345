@@ -30,10 +30,15 @@ class UserOut(BaseModel):
         from_attributes = True  # 让 ORM 对象能直接转成这个模型
 
 
+# 方向取值：long=做多 / short=做空
+DIRECTION_PATTERN = r"^(long|short)$"
+
+
 # ===== 持仓 =====
 class PositionCreate(BaseModel):
     """新增持仓"""
     code: str = Field(..., min_length=2, max_length=32)
+    direction: str = Field("long", pattern=DIRECTION_PATTERN, description="long=做多 / short=做空")
     buy_price: float
     lots: float = 1.0
     multiplier: Optional[float] = None
@@ -42,6 +47,7 @@ class PositionCreate(BaseModel):
 class PositionUpdate(BaseModel):
     """修改持仓（字段均可选，只更新传入的字段）"""
     code: Optional[str] = Field(None, min_length=2, max_length=32)
+    direction: Optional[str] = Field(None, pattern=DIRECTION_PATTERN, description="long=做多 / short=做空")
     buy_price: Optional[float] = None
     lots: Optional[float] = None
     multiplier: Optional[float] = None
@@ -50,6 +56,7 @@ class PositionUpdate(BaseModel):
 class PositionOut(BaseModel):
     id: int
     code: str
+    direction: str
     buy_price: float
     lots: float
     multiplier: Optional[float]
@@ -64,6 +71,7 @@ class PositionOut(BaseModel):
 class SettlementCreate(BaseModel):
     """结算持仓：只需结算价，其余字段（名称/币种/乘数）可选，后端会从持仓快照兜底"""
     settle_price: float
+    direction: Optional[str] = Field(None, pattern=DIRECTION_PATTERN, description="可选，缺省用持仓的方向")
     name: Optional[str] = None
     currency: Optional[str] = None
     multiplier: Optional[float] = None
@@ -72,6 +80,7 @@ class SettlementCreate(BaseModel):
 class SettlementOut(BaseModel):
     id: int
     code: str
+    direction: str
     name: Optional[str]
     buy_price: float
     settle_price: float

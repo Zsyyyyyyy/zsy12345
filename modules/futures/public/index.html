@@ -171,7 +171,7 @@
   .pos-form { display: flex; flex-direction: column; gap: 10px; }
   .pos-form label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .pos-form label span { width: 84px; text-align: right; flex-shrink: 0; }
-  .pos-form input { flex: 1; width: auto; }
+  .pos-form input, .pos-form select { flex: 1; width: auto; }
   .pos-form .row-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
   .pos-form .row-btns .primary { color: var(--accent); border-color: var(--accent); }
   .pos-form .msg { color: var(--up); font-size: 11px; min-height: 14px; }
@@ -254,7 +254,7 @@
     <aside id="positions"></aside>
   </div>
 
-  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：新浪财经 · 涨红跌绿 · 国内期货可点名称看分时图 · 带 <span class="pos-tag" style="margin:0 2px">持</span> 标记且左侧有色条的行 = 你已持仓（悬浮看买入价与手数）</footer>
+  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：新浪财经 · 涨红跌绿 · 国内期货可点名称看分时图 · 带 <span class="pos-tag" style="margin:0 2px">持</span> 标记且左侧有色条的行 = 你已持仓（悬浮看方向、开仓价与手数）</footer>
   </div>
 </div>
 
@@ -281,7 +281,11 @@
       </div>
       <div class="pos-form">
         <label><span>代码</span><input id="posCode" placeholder="nf_RB2701" autocomplete="off"></label>
-        <label><span>买入价</span><input id="posBuy" type="number" step="any" placeholder="1030"></label>
+        <label><span>方向</span><select id="posDir">
+          <option value="long">做多（买涨）</option>
+          <option value="short">做空（买跌）</option>
+        </select></label>
+        <label><span id="posBuyLabel">买入价</span><input id="posBuy" type="number" step="any" placeholder="1030"></label>
         <label><span>手数</span><input id="posLots" type="number" step="any" placeholder="1"></label>
         <label><span>乘数(可选)</span><input id="posMult" type="number" step="any" placeholder="留空自动查"></label>
         <div class="row-btns">
@@ -379,6 +383,8 @@
   const posMask = document.getElementById('posMask');
   const posTitle = document.getElementById('posTitle');
   const posCode = document.getElementById('posCode');
+  const posDir = document.getElementById('posDir');
+  const posBuyLabel = document.getElementById('posBuyLabel');
   const posBuy = document.getElementById('posBuy');
   const posLots = document.getElementById('posLots');
   const posMult = document.getElementById('posMult');
@@ -680,7 +686,7 @@
     // 统一用 Number 转字符串，避免出现 1030.0 / 708.00 这类位数不齐的显示
     const lots = Number(pos.lots);
     const lotsTxt = Number.isInteger(lots) ? String(lots) : String(lots);
-    return '持仓 ' + lotsTxt + ' 手 @' + Number(pos.buyPrice);
+    return '持仓 ' + dirLabel(dirOf(pos)) + ' ' + lotsTxt + ' 手 @' + Number(pos.buyPrice);
   }
   // 名称单元格的标记与提示（持仓标签 + 分时图提示）
   function nameCell(d, code, pos) {
@@ -775,6 +781,15 @@
     if (pos.multiplier != null && !isNaN(pos.multiplier)) return Number(pos.multiplier);
     return MULTIPLIER[productCode(pos.code)] || 1;
   }
+  // 方向：long=做多 / short=做空。旧数据没有该字段时按做多处理
+  function dirOf(p) { return (p && p.direction === 'short') ? 'short' : 'long'; }
+  function dirLabel(dir) { return dir === 'short' ? '空' : '多'; }
+  // 价差按方向取正负，保证「价差为正 = 这笔在赚」
+  function diffOf(price, buy, dir) {
+    if (isNaN(price) || isNaN(buy)) return NaN;
+    const raw = price - buy;
+    return dir === 'short' ? -raw : raw;
+  }
 
   function renderPositions(dataMap) {
     const box = document.getElementById('positions');
@@ -786,9 +801,10 @@
       const buy = Number(p.buyPrice);
       const lots = Number(p.lots) || 1;
       const mult = multiplierOf(p);
-      const diff = (!isNaN(price) && !isNaN(buy)) ? price - buy : NaN;
+      const dir = dirOf(p);
+      const diff = diffOf(price, buy, dir);
       const pnl = isNaN(diff) ? NaN : diff * lots * mult;
-      return { id: p.id, code: p.code, name, price, buy, lots, diff, pnl, currency: currencyOf(p.code) };
+      return { id: p.id, code: p.code, name, price, buy, lots, diff, pnl, dir, currency: currencyOf(p.code) };
     });
     const sorted = rows.slice().sort((a, b) => {
       const av = isNaN(a.pnl) ? -Infinity : a.pnl;
@@ -805,14 +821,15 @@
       '<button class="sort-btn" id="historyBtn">结算记录</button>' +
       '<button class="sort-btn" id="sortBtn">盈亏' + (sortDesc ? ' ↓' : ' ↑') + '</button>' +
       '<button class="sort-btn" id="addPosBtn">+ 新增</button></div></div>';
-    html += '<table><thead><tr><th class="num">#</th><th>名称</th><th>现价</th><th>买入价</th><th>价差</th><th>手数</th><th>盈亏</th><th></th></tr></thead><tbody>';
+    html += '<table><thead><tr><th class="num">#</th><th>名称</th><th>方向</th><th>现价</th><th>开仓价</th><th>价差</th><th>手数</th><th>盈亏</th><th></th></tr></thead><tbody>';
     if (!sorted.length) {
-      html += '<tr><td colspan="8" class="flat">暂无持仓，点右上角「+ 新增」添加</td></tr>';
+      html += '<tr><td colspan="9" class="flat">暂无持仓，点右上角「+ 新增」添加</td></tr>';
     } else {
       sorted.forEach((r, idx) => {
         const cls = !isNaN(r.pnl) ? (r.pnl > 0 ? 'up' : r.pnl < 0 ? 'down' : 'flat') : 'flat';
         const sign = !isNaN(r.diff) && r.diff > 0 ? '+' : '';
         html += `<tr data-id="${r.id}"><td class="flat num">${idx + 1}</td><td class="name" title="${r.code}">${r.name}</td>` +
+          `<td class="${r.dir === 'short' ? 'down' : 'up'}">${dirLabel(r.dir)}</td>` +
           `<td>${isNaN(r.price) ? '--' : fmtNum(r.price)}</td>` +
           `<td>${fmtNum(r.buy)}</td>` +
           `<td class="${cls}">${isNaN(r.diff) ? '--' : sign + fmtNum(r.diff, 2)}</td>` +
@@ -848,12 +865,19 @@
     }));
   }
 
+  // 方向切换时，开仓价的叫法跟着变（做多=买入价，做空=卖出价）
+  function syncDirLabel() {
+    posBuyLabel.textContent = posDir.value === 'short' ? '卖出价' : '买入价';
+  }
+
   // ===== 持仓增删改 =====
   let editingPosId = null; // 当前编辑的持仓 id（null = 新增）
   function openPosForm(pos) {
     editingPosId = pos ? pos.id : null;
     posTitle.textContent = pos ? '修改持仓' : '新增持仓';
     posCode.value = pos ? pos.code : '';
+    posDir.value = pos ? dirOf(pos) : 'long';
+    syncDirLabel();
     posBuy.value = pos ? pos.buyPrice : '';
     posLots.value = pos ? pos.lots : '';
     posMult.value = (pos && pos.multiplier != null) ? pos.multiplier : '';
@@ -908,6 +932,7 @@
     const lots = Number(lotsRaw);
     const payload = {
       code,
+      direction: posDir.value,
       buy_price: buy,
       lots: (lotsRaw === '' || isNaN(lots) || lots <= 0) ? 1 : lots,
     };
@@ -961,7 +986,7 @@
     const cur = isNaN(curPrice) ? '--' : fmtNum(curPrice);
     settleTitle.textContent = '结算持仓';
     settleInfo.innerHTML = '品种：<b>' + name + '</b>（' + p.code + '）<br>' +
-      '买入价：<b>' + fmtNum(Number(p.buyPrice)) + '</b> · 手数：<b>' + p.lots + '</b> · 现价：<b>' + cur + '</b>';
+      '方向：<b>' + dirLabel(dirOf(p)) + '</b> · 开仓价：<b>' + fmtNum(Number(p.buyPrice)) + '</b> · 手数：<b>' + p.lots + '</b> · 现价：<b>' + cur + '</b>';
     settlePrice.value = isNaN(curPrice) ? '' : curPrice;
     settleMsg.textContent = '';
     settleMask.classList.add('show');
@@ -980,6 +1005,7 @@
     const name = d ? d.name : null;
     const payload = {
       settle_price: price,
+      direction: dirOf(p),
       name,
       currency: currencyOf(p.code),
       multiplier: multiplierOf(p),
@@ -1014,13 +1040,15 @@
       const list = await resp.json();
       historySub.textContent = '共 ' + list.length + ' 笔';
       if (!list.length) { historyBody.innerHTML = '<div class="flat" style="padding:8px;">暂无结算记录</div>'; return; }
-      let html = '<table class="settle-table"><thead><tr><th>品种</th><th>买入价</th><th>结算价</th><th>手数</th><th>盈亏</th><th>时间</th></tr></thead><tbody>';
+      let html = '<table class="settle-table"><thead><tr><th>品种</th><th>方向</th><th>开仓价</th><th>结算价</th><th>手数</th><th>盈亏</th><th>时间</th></tr></thead><tbody>';
       list.forEach((s) => {
         const cls = s.pnl > 0 ? 'up' : s.pnl < 0 ? 'down' : 'flat';
+        const dir = dirOf(s);
         const nm = s.name || s.code;
         const t = String(s.settled_at || '').replace('T', ' ').slice(0, 19);
         html += '<tr>' +
           '<td class="name" title="' + s.code + '">' + nm + '</td>' +
+          `<td class="${dir === 'short' ? 'down' : 'up'}">${dirLabel(dir)}</td>` +
           '<td>' + fmtNum(s.buy_price) + '</td>' +
           '<td>' + fmtNum(s.settle_price) + '</td>' +
           '<td>' + s.lots + '</td>' +
@@ -1058,6 +1086,7 @@
   posMask.addEventListener('click', (e) => { if (e.target === posMask) closePosForm(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePosForm(); });
   posCode.addEventListener('keydown', (e) => { if (e.key === 'Enter') posBuy.focus(); });
+  posDir.addEventListener('change', syncDirLabel);
   posBuy.addEventListener('keydown', (e) => { if (e.key === 'Enter') posLots.focus(); });
   posLots.addEventListener('keydown', (e) => { if (e.key === 'Enter') posMult.focus(); });
   posMult.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePos(); });
@@ -1364,6 +1393,7 @@
       configPositions = ps.map((p) => ({
         id: p.id,
         code: normalizeCode(p.code),
+        direction: p.direction || 'long',
         buyPrice: Number(p.buy_price),
         lots: Number(p.lots) || 1,
         multiplier: p.multiplier != null ? Number(p.multiplier) : undefined,

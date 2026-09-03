@@ -19,14 +19,17 @@ class User(Base):
 
 
 class Position(Base):
-    """期货/股票持仓（行情看板「我的持仓」，按用户隔离）"""
+    """期货/股票持仓（行情看板「我的持仓」，按用户隔离；同一品种可建多条）"""
     __tablename__ = "positions"
-    __table_args__ = (UniqueConstraint("user_id", "code", name="uq_positions_user_code"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="所属用户 id")
     code: Mapped[str] = mapped_column(String(32), nullable=False, comment="品种代码（如 nf_SA2701）")
-    buy_price: Mapped[float] = mapped_column(Float, nullable=False, comment="买入价")
+    direction: Mapped[str] = mapped_column(
+        String(8), default="long", server_default="long", nullable=False,
+        comment="方向：long=做多 / short=做空",
+    )
+    buy_price: Mapped[float] = mapped_column(Float, nullable=False, comment="开仓价（做多=买入价，做空=卖出价）")
     lots: Mapped[float] = mapped_column(Float, default=1.0, nullable=False, comment="手数")
     multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="每点价值（可选，不填则按品种自动查）")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
@@ -58,11 +61,15 @@ class Settlement(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="所属用户 id")
     code: Mapped[str] = mapped_column(String(32), nullable=False, comment="品种代码（如 nf_SA2701）")
+    direction: Mapped[str] = mapped_column(
+        String(8), default="long", server_default="long", nullable=False,
+        comment="开仓方向快照：long=做多 / short=做空",
+    )
     name: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="品种名称快照")
-    buy_price: Mapped[float] = mapped_column(Float, nullable=False, comment="买入价快照")
+    buy_price: Mapped[float] = mapped_column(Float, nullable=False, comment="开仓价快照")
     settle_price: Mapped[float] = mapped_column(Float, nullable=False, comment="结算价")
     lots: Mapped[float] = mapped_column(Float, default=1.0, nullable=False, comment="手数")
     multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="每点价值快照")
-    pnl: Mapped[float] = mapped_column(Float, nullable=False, comment="盈亏 = (结算价-买入价)*手数*乘数")
+    pnl: Mapped[float] = mapped_column(Float, nullable=False, comment="盈亏（已按方向计：多=(结算价-开仓价)，空=(开仓价-结算价)，再×手数×乘数）")
     currency: Mapped[str] = mapped_column(String(8), default="CNY", nullable=False, comment="币种 CNY/USD/HKD")
     settled_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="结算时间")

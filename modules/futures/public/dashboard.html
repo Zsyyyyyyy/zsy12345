@@ -473,8 +473,9 @@
     if (!s) return '';
     if (/^NF_/.test(s)) return s.replace(/^NF_/, 'nf_');
     if (/^HF_/.test(s)) return s.replace(/^HF_/, 'hf_');
-    // 股票 / 指数：带 sh/sz/bj 前缀（如 sh600519 / bj899050）
-    if (/^(SH|SZ|BJ)\d/.test(s)) return s.toLowerCase();
+    // 股票 / 指数：带 sh/sz/bj 前缀（如 sh600519 / bj899050），必须是 6 位数字。
+    // 注意不能只匹配 \d：SH 同时是烧碱期货品种代码，SH2701（4 位）应归期货而非上交所。
+    if (/^(SH|SZ|BJ)\d{6}$/.test(s)) return s.toLowerCase();
     // 港股：hk 前缀（如 hkHSTECH 恒生科技 / hk00700 腾讯）
     if (/^HK/.test(s)) return 'hk' + s.slice(2);
     // 纯 6 位数字：先判沪市指数（000 开头的指数代码加 sh 前缀），再按首位判断交易所：6→沪、0/3→深、4/8→北
@@ -494,7 +495,7 @@
     if (!s) return '';
     if (/^NF_/.test(s)) return s.replace(/^NF_/, 'nf_');
     if (/^HF_/.test(s)) return s.replace(/^HF_/, 'hf_');
-    if (/^(SH|SZ|BJ)\d/.test(s)) return s.toLowerCase();
+    if (/^(SH|SZ|BJ)\d{6}$/.test(s)) return s.toLowerCase();
     if (/^HK/.test(s)) return 'hk' + s.slice(2);
     if (/^\d{6}$/.test(s)) {
       if (SH_INDEX_TAIL.test(s)) return 'sh' + s;
@@ -929,6 +930,24 @@
     const lotsRaw = posLots.value.trim();
     const multRaw = posMult.value.trim();
     if (!code) { posMsg.textContent = '请输入完整合约代码（如 RB2701），或从联想列表选择'; return; }
+    // 国内期货：提交前先查 tradable_futures 表，合约存在且 is_active=1 才允许添加
+    if (code.startsWith('nf_')) {
+      try {
+        const vr = await fetch('/api/tradable-futures/validate', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ codes: [code] }),
+        });
+        if (vr.status === 401) { toLogin(); return; }
+        if (!vr.ok) { posMsg.textContent = '校验合约失败 HTTP ' + vr.status; return; }
+        const vj = await vr.json();
+        const r = (vj.results || []).find((x) => x.code === code);
+        if (!r || !r.ok) { posMsg.textContent = (r && r.reason) || '合约不在可交易清单中（可能已到期下架或不存在）'; return; }
+      } catch (e) {
+        posMsg.textContent = '校验合约失败：' + e.message;
+        return;
+      }
+    }
     const buy = Number(buyRaw);
     if (buyRaw === '' || isNaN(buy)) { posMsg.textContent = '请输入买入价'; return; }
     const lots = Number(lotsRaw);

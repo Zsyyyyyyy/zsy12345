@@ -307,6 +307,7 @@
       <div class="settle-info" id="settleInfo"></div>
       <div class="settle-form">
         <label><span>结算价</span><input id="settlePrice" type="number" step="any" placeholder="平仓价格"></label>
+        <label><span>手数</span><input id="settleLots" type="number" step="any" min="0" placeholder="留空=全部平仓"></label>
         <div class="row-btns">
           <button id="settleCancel">取消</button>
           <button id="settleSave" class="primary">结算</button>
@@ -816,7 +817,7 @@
     sorted.forEach((r) => { if (!isNaN(r.pnl)) totals[r.currency] = (totals[r.currency] || 0) + r.pnl; });
     const cNames = { CNY: '人民币', USD: '美元', HKD: '港币' };
 
-    let html = '<section><div class="pos-head"><h2>我的</h2>' +
+    let html = '<section><div class="pos-head"><h2>我的持仓</h2>' +
       '<div style="display:flex;gap:6px;">' +
       '<button class="sort-btn" id="historyBtn">结算记录</button>' +
       '<button class="sort-btn" id="sortBtn">盈亏' + (sortDesc ? ' ↓' : ' ↑') + '</button>' +
@@ -984,16 +985,19 @@
     const name = d ? d.name : p.code;
     const curPrice = d ? Number(d.price) : NaN;
     const cur = isNaN(curPrice) ? '--' : fmtNum(curPrice);
+    const totalLots = Number(p.lots) || 0;
     settleTitle.textContent = '结算持仓';
     settleInfo.innerHTML = '品种：<b>' + name + '</b>（' + p.code + '）<br>' +
-      '方向：<b>' + dirLabel(dirOf(p)) + '</b> · 开仓价：<b>' + fmtNum(Number(p.buyPrice)) + '</b> · 手数：<b>' + p.lots + '</b> · 现价：<b>' + cur + '</b>';
+      '方向：<b>' + dirLabel(dirOf(p)) + '</b> · 开仓价：<b>' + fmtNum(Number(p.buyPrice)) + '</b> · 持仓手数：<b>' + totalLots + '</b> · 现价：<b>' + cur + '</b>';
     settlePrice.value = isNaN(curPrice) ? '' : curPrice;
+    settleLots.value = totalLots;  // 默认按全部手数结算
+    settleLots.max = totalLots;    // HTML5 提示，配合后端校验兜底
     settleMsg.textContent = '';
     settleMask.classList.add('show');
     settlePrice.focus();
     settlePrice.select();
   }
-  function closeSettleForm() { settleMask.classList.remove('show'); settlingPosId = null; }
+  function closeSettleForm() { settleMask.classList.remove('show'); settlingPosId = null; settleLots.value = ''; }
   async function settlePos() {
     const raw = settlePrice.value.trim();
     const price = Number(raw);
@@ -1003,6 +1007,15 @@
     if (!p) { settleMsg.textContent = '持仓不存在'; return; }
     const d = lastDataMap[p.code];
     const name = d ? d.name : null;
+    // 手数：留空 / 空字符串 = 全部平仓；否则按用户输入校验
+    const lotsRaw = settleLots.value.trim();
+    let lots = null;
+    if (lotsRaw !== '') {
+      lots = Number(lotsRaw);
+      const total = Number(p.lots) || 0;
+      if (!Number.isFinite(lots) || lots <= 0) { settleMsg.textContent = '手数必须为正数'; return; }
+      if (lots > total + 1e-9) { settleMsg.textContent = '手数不能超过持仓手数 ' + total; return; }
+    }
     const payload = {
       settle_price: price,
       direction: dirOf(p),
@@ -1010,6 +1023,7 @@
       currency: currencyOf(p.code),
       multiplier: multiplierOf(p),
     };
+    if (lots !== null) payload.lots = lots;
     try {
       const resp = await fetch('/api/positions/' + settlingPosId + '/settle', {
         method: 'POST',

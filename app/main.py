@@ -41,7 +41,7 @@ def favicon():
 @app.get("/futures")
 def futures_page():
     """行情看板（前端展示，接口由本后端提供）"""
-    return FileResponse(BASE_DIR / "modules" / "futures" / "public" / "index.html")
+    return FileResponse(BASE_DIR / "modules" / "futures" / "public" / "dashboard.html")
 
 
 # 认证接口：/register、/login、/me

@@ -9,6 +9,7 @@ from app.routers.auth import router as auth_router
 from app.routers.futures import router as futures_router
 from app.routers.positions import router as positions_router
 from app.routers.settlements import router as settlements_router
+from app.routers.tradable_futures import router as tradable_futures_router
 from app.routers.watchlist import router as watchlist_router
 
 # 启动时自动建表（已手动建过则无副作用；生产环境建议换 Alembic 迁移）
@@ -41,7 +42,7 @@ def favicon():
 @app.get("/futures")
 def futures_page():
     """行情看板（前端展示，接口由本后端提供）"""
-    return FileResponse(BASE_DIR / "modules" / "futures" / "public" / "index.html")
+    return FileResponse(BASE_DIR / "modules" / "futures" / "public" / "dashboard.html")
 
 
 # 认证接口：/register、/login、/me
@@ -52,6 +53,9 @@ app.include_router(futures_router)
 
 # 持仓 CRUD 接口：/api/positions
 app.include_router(positions_router)
+
+# 国内期货品种字典接口：/api/tradable-futures
+app.include_router(tradable_futures_router)
 
 # 结算接口：/api/positions/{id}/settle、/api/settlements
 app.include_router(settlements_router)

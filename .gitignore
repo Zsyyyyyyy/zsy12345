@@ -24,6 +24,9 @@ venv/
 .vscode/
 *.iml
 
+# ===== 运行日志（deploy.sh 生成） =====
+logs/
+
 # ===== 系统 =====
 .DS_Store
 

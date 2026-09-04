@@ -1,148 +1,163 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEON TETRIS · 霓虹俄罗斯方块</title>
+<html lang="zh-CN" data-page-node-id="lvJyzmleQW0AyGKkHGbAgH">
+<head data-page-node-id="7dCuzw7cVrzt2nFrBp6Ut2">
+<meta charset="UTF-8" data-page-node-id="AiKGHuUoDk3KtQFoA5jWW5">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="qlrhJKXEXGLeXv3ANAHZug">
+<title>俄罗斯方块 · zsy12345 工具箱</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace !important; }
   :root {
-    --bg: #0a0a12;
-    --panel: #12121f;
-    --panel-2: #1a1a2e;
-    --border: #2a2a44;
-    --text: #e8e8f0;
-    --dim: #6b6b85;
-    --accent: #00e5ff;
-    --accent-2: #ff2e88;
-    --good: #2ee6a6;
+    --bg: #000;
+    --panel: #0d0d0d;
+    --panel-2: #111;
+    --border: #262626;
+    --text: #d4d4d4;
+    --dim: #666;
+    --accent: #58a6ff;
+    --accent-2: #7ee787;
+    --good: #3fb950;
+    --board-bg: #0a0a0a;
   }
   html, body {
-    height: 100%;
+    min-height: 100%;
     background: var(--bg);
     color: var(--text);
-    font-family: "SF Mono", "JetBrains Mono", "Consolas", monospace;
-    overflow: hidden;
+    overflow-x: hidden;
   }
   body {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    background: #000;
+    padding: 20px;
   }
-  .back-home {
-    position: fixed; top: 16px; left: 16px; z-index: 100;
-    font-family: "SF Mono","Monaco","Consolas",monospace;
-    font-size: 12px; color: #444; text-decoration: none;
-    transition: color 0.2s;
+  .term {
+    width: 100%; max-width: 660px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
   }
-  .back-home:hover { color: #7ee787; }
+  .term-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; background: #151515;
+    border-bottom: 1px solid var(--border);
+  }
+  .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .term-dot.r { background: #ff5f56; }
+  .term-dot.y { background: #ffbd2e; }
+  .term-dot.g { background: #27c93f; }
+  .term-label { margin-left: 8px; font-size: 12px; color: #555; }
+
+  .container { padding: 20px 28px 28px; }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: var(--dim); text-decoration: none;
+    font-size: 12px; margin-bottom: 8px; transition: color 0.2s;
+  }
+  .back-link:hover { color: var(--text); }
+  .header { text-align: center; margin-bottom: 16px; }
+  .header h1 {
+    font-size: 18px; font-weight: 400; color: var(--text);
+    margin-bottom: 4px; letter-spacing: 0.5px;
+  }
+  .header .subtitle { font-size: 12px; color: var(--dim); letter-spacing: 1px; }
+
   .stage {
     display: flex;
-    gap: 22px;
+    gap: 20px;
     align-items: flex-start;
-    padding: 18px;
+    justify-content: center;
   }
   /* 主棋盘外框 */
   .board-wrap {
     position: relative;
-    padding: 12px;
-    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    padding: 10px;
+    background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: 0 0 40px rgba(0,229,255,0.08), inset 0 0 30px rgba(0,0,0,0.5);
+    border-radius: 8px;
   }
   canvas#board {
     display: block;
-    background: #06060d;
-    border-radius: 8px;
-    box-shadow: 0 0 0 1px rgba(0,229,255,0.15);
+    background: var(--board-bg);
+    border-radius: 4px;
   }
   /* 覆盖层：开始 / 暂停 / 结束 */
   .overlay {
     position: absolute;
-    inset: 12px;
-    border-radius: 8px;
-    background: rgba(6,6,13,0.86);
-    backdrop-filter: blur(4px);
+    inset: 10px;
+    border-radius: 4px;
+    background: rgba(6,6,6,0.9);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
+    gap: 12px;
     text-align: center;
     z-index: 5;
   }
   .overlay.hidden { display: none; }
   .overlay h2 {
-    font-size: 26px;
-    letter-spacing: 2px;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .overlay p { color: var(--dim); font-size: 13px; line-height: 1.7; }
-  .overlay .final-score { color: var(--accent); font-size: 20px; }
-  .btn {
-    margin-top: 6px;
-    padding: 11px 26px;
-    font-family: inherit;
-    font-size: 14px;
+    font-size: 20px;
     letter-spacing: 1px;
-    color: #06121a;
-    background: linear-gradient(90deg, var(--accent), #5ef0ff);
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: transform .12s ease, box-shadow .12s ease;
-    box-shadow: 0 0 18px rgba(0,229,255,0.4);
+    font-weight: 400;
+    color: var(--text);
   }
-  .btn:hover { transform: translateY(-1px); box-shadow: 0 0 26px rgba(0,229,255,0.6); }
-  .btn:active { transform: translateY(0); }
+  .overlay p { color: var(--dim); font-size: 12px; line-height: 1.7; }
+  .overlay .final-score { color: var(--accent-2); font-size: 16px; }
+  .btn {
+    margin-top: 4px;
+    padding: 8px 20px;
+    font-family: inherit;
+    font-size: 13px;
+    color: #fff;
+    background: #238636;
+    border: 1px solid #2ea043;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .btn:hover { background: #2ea043; }
 
   /* 右侧信息栏 */
   .side {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    width: 168px;
+    gap: 12px;
+    width: 160px;
   }
   .card {
-    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 16px;
+    border-radius: 8px;
+    padding: 12px 14px;
   }
   .card .label {
     font-size: 11px;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
     color: var(--dim);
-    text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   .card .value {
-    font-size: 26px;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: 400;
     color: var(--accent);
-    text-shadow: 0 0 12px rgba(0,229,255,0.4);
     line-height: 1.1;
   }
   .card .row { display: flex; gap: 10px; }
   .card .row > div { flex: 1; }
-  .card .row .value { font-size: 20px; }
+  .card .row .value { font-size: 18px; }
   canvas#next {
     display: block;
     margin: 0 auto;
-    background: #06060d;
-    border-radius: 6px;
+    background: var(--board-bg);
+    border-radius: 4px;
   }
   .keys {
     font-size: 11px;
     color: var(--dim);
     line-height: 1.9;
   }
-  .keys b { color: var(--text); font-weight: 600; }
+  .keys b { color: var(--text); font-weight: 400; }
   .keys kbd {
     display: inline-block;
     min-width: 18px;
@@ -150,24 +165,18 @@
     margin: 0 2px;
     font-family: inherit;
     font-size: 11px;
-    color: var(--accent);
-    background: #06060d;
+    color: var(--accent-2);
+    background: var(--board-bg);
     border: 1px solid var(--border);
     border-radius: 4px;
     text-align: center;
   }
-  .title-bar {
-    text-align: center;
-    margin-bottom: 4px;
+  @media (max-height: 800px) {
+    .stage { transform: scale(0.9); transform-origin: top center; }
+    .container { padding-bottom: 12px; }
   }
-  .title-bar h1 {
-    font-size: 13px;
-    letter-spacing: 6px;
-    color: var(--dim);
-    font-weight: 400;
-  }
-  @media (max-height: 720px) {
-    .stage { transform: scale(0.82); transform-origin: center; }
+  @media (max-height: 700px) {
+    .stage { transform: scale(0.8); }
   }
   @media (max-width: 560px) {
     .stage { flex-direction: column; align-items: center; }
@@ -176,51 +185,65 @@
   }
 </style>
 </head>
-<body>
-  <a class="back-home" href="/">← cd ..</a>
-  <div class="stage">
-    <div>
-      <div class="title-bar"><h1>N E O N &nbsp; T E T R I S</h1></div>
-      <div class="board-wrap">
-        <canvas id="board" width="300" height="600"></canvas>
-        <div class="overlay" id="overlay">
-          <h2 id="ov-title">NEON TETRIS</h2>
-          <p id="ov-text">霓虹俄罗斯方块<br>按下方按钮或空格开始</p>
-          <p id="ov-score" class="final-score" style="display:none;"></p>
-          <button class="btn" id="startBtn">开始游戏</button>
+<body data-page-node-id="NxWm6dAJaISg9q6rt6pkVe">
+<div class="term" data-page-node-id="zxJUpSn9kGziYxyH0lLVOD">
+    <div class="term-bar" data-page-node-id="8B4kCHRBISM59O70XZB9dm">
+        <span class="term-dot r" data-page-node-id="3oDN6WhRj8Es7ChTGzW97G"></span>
+        <span class="term-dot y" data-page-node-id="PsTImI21igNZAW5HGPLwzq"></span>
+        <span class="term-dot g" data-page-node-id="GmitjjzVqr8mJnkpUFfniV"></span>
+        <span class="term-label" data-page-node-id="susfyb7HxWwfDEpQhiIgDx">zsy@macbook — tetris</span>
+    </div>
+    <div class="container" data-page-node-id="bgOFiw4QUN6QnnCCAgxPE0">
+        <a class="back-link" href="/" data-page-node-id="jMozZnAg7gnGrx3E6qgH6O">← cd ..</a>
+        <div class="header" data-page-node-id="jfvSvVNMLKepXe7luxqkUR">
+            <h1 data-page-node-id="w42id9RkU3DxegLHpQjGlu">$ tetris</h1>
+            <div class="subtitle" data-page-node-id="GX9TM7WtZWegvK08XCyodh">俄罗斯方块 · 方向键移动 · 空格硬降</div>
+        </div>
+        <div class="stage" data-page-node-id="WnupTFGCwRoMeNZHE54yCZ">
+    <div data-page-node-id="VPKk6j9CrHkYMQx1ZNv8MB">
+      <div class="board-wrap" data-page-node-id="qcPJQ1dDpQq0BBvg4E5IoC">
+        <canvas id="board" width="300" height="600" data-page-node-id="BSTdavxfNsEXY7ZxxogYz5"></canvas>
+        <div class="overlay" id="overlay" data-page-node-id="8M0JLigBVgS1IZ0NTEehta">
+          <h2 id="ov-title" data-page-node-id="livnlqOjK992uIk5OHC6VH">TETRIS</h2>
+          <p id="ov-text" data-page-node-id="PFzHnTx6IsN0usVrK6Q34D">俄罗斯方块<br data-page-node-id="8fakFtt2mZVCya6UD9AkSn">按下方按钮或空格开始</p>
+          <p id="ov-score" class="final-score" style="display:none;" data-page-node-id="HQDMUuQkEMtWX085gx4qtO"></p>
+          <button class="btn" id="startBtn" data-page-node-id="8464MTMMIvon9AFab9YDKe">开始游戏</button>
         </div>
       </div>
     </div>
-    <div class="side">
-      <div class="card">
-        <div class="label">下一个</div>
-        <canvas id="next" width="120" height="96"></canvas>
+    <div class="side" data-page-node-id="PSdqC9TKDk1Dl69AsfihpY">
+      <div class="card" data-page-node-id="DwSwKBR36md7IUtjWMR2B5">
+        <div class="label" data-page-node-id="kRt5nxFpQkNHLCJ4bAb1PG">下一个</div>
+        <canvas id="next" width="120" height="96" data-page-node-id="W3WPluv30q12uCB7GMWDMH"></canvas>
       </div>
-      <div class="card">
-        <div class="label">分数</div>
-        <div class="value" id="score">0</div>
+      <div class="card" data-page-node-id="54WtfE9usQnFhfd0gQIxEH">
+        <div class="label" data-page-node-id="CG8yXI83iwRaAGKQznv4Zi">分数</div>
+        <div class="value" id="score" data-page-node-id="ncIhLNR3hIOkKEofcb1ftd">0</div>
       </div>
-      <div class="card">
-        <div class="row">
-          <div>
-            <div class="label">行数</div>
-            <div class="value" id="lines">0</div>
+      <div class="card" data-page-node-id="4OdF6lsqJ5SajOHuXgqErw">
+        <div class="row" data-page-node-id="JAoBYaJKKHNUOAeY9nvQOx">
+          <div data-page-node-id="1vIup1zgpgX5X25jN2r75t">
+            <div class="label" data-page-node-id="oJoV4zXWROv6mDDGwhCklK">行数</div>
+            <div class="value" id="lines" data-page-node-id="mhJl2sDy1RabnFVhIHkMJI">0</div>
           </div>
-          <div>
-            <div class="label">等级</div>
-            <div class="value" id="level">1</div>
+          <div data-page-node-id="x3DiwylHeL6sQDM4FzhL7L">
+            <div class="label" data-page-node-id="aYB5f5xE9RBTGtW1gTbTRk">等级</div>
+            <div class="value" id="level" data-page-node-id="HFmHRWSVJfW17MQYkyi40P">1</div>
           </div>
         </div>
       </div>
-      <div class="card keys">
-        <div class="label">操作</div>
-        <b>← →</b> 移动 &nbsp; <b>↓</b> 加速<br>
-        <b>↑</b> / <kbd>W</kbd> 旋转<br>
-        <b>空格</b> 硬降 &nbsp; <kbd>P</kbd> 暂停
+      <div class="card keys" data-page-node-id="5bc18TFMV1mwrDFCQgUPwW">
+        <div class="label" data-page-node-id="SfpvAdLqXpupHo8zA38yoc">操作</div>
+        <b data-page-node-id="GoggSmjBjbtf32FSxgHcbP">← →</b> 移动 &nbsp; <b data-page-node-id="LXUlHXXsiKrkoj3L8HWdWS">↓</b> 加速<br data-page-node-id="WNs5QKABDhpG5OzN1zMJF3">
+        <b data-page-node-id="4KikapkQLG9WgRicUplcfU">↑</b> / <kbd data-page-node-id="SBfYXJpQGoV96nF0Go5Daa">W</kbd> 旋转<br data-page-node-id="YNiuVkUM9pJHtycpCvs9Be">
+        <b data-page-node-id="oABAjgnOoc3uTbAEWBACpb">空格</b> 硬降 &nbsp; <kbd data-page-node-id="BwaRyu6z5pKfTTrue4r2vS">P</kbd> 暂停
       </div>
+    </div>
     </div>
   </div>
+</div>
 
+<script src="/modules/lib/terminal.js"></script>
 <script>
 (function () {
   "use strict";
@@ -246,14 +269,16 @@
   const startBtn = document.getElementById("startBtn");
 
   // 7 种 Tetromino（用 4x4 矩阵旋转最稳）
+  // 配色沿用 GitHub 深色主题调色板，与其他终端风格模块保持一致
+  const BOARD_BG = "#0a0a0a";
   const SHAPES = {
-    I: { color: "#00e5ff", cells: [[1,1,1,1]] },
-    O: { color: "#ffd23f", cells: [[1,1],[1,1]] },
-    T: { color: "#b14aed", cells: [[0,1,0],[1,1,1]] },
-    S: { color: "#2ee6a6", cells: [[0,1,1],[1,1,0]] },
-    Z: { color: "#ff4d5e", cells: [[1,1,0],[0,1,1]] },
-    J: { color: "#3a7bff", cells: [[1,0,0],[1,1,1]] },
-    L: { color: "#ff9433", cells: [[0,0,1],[1,1,1]] }
+    I: { color: "#58a6ff", cells: [[1,1,1,1]] },
+    O: { color: "#e3b341", cells: [[1,1],[1,1]] },
+    T: { color: "#bc8cff", cells: [[0,1,0],[1,1,1]] },
+    S: { color: "#3fb950", cells: [[0,1,1],[1,1,0]] },
+    Z: { color: "#f85149", cells: [[1,1,0],[0,1,1]] },
+    J: { color: "#79c0ff", cells: [[1,0,0],[1,1,1]] },
+    L: { color: "#ffa657", cells: [[0,0,1],[1,1,1]] }
   };
   const KEYS = Object.keys(SHAPES);
 
@@ -362,25 +387,25 @@
     c.fillStyle = color;
     c.fillRect(px + 1, py + 1, size - 2, size - 2);
     // 高光（左上）
-    c.fillStyle = "rgba(255,255,255,0.28)";
-    c.fillRect(px + 1, py + 1, size - 2, Math.max(3, size * 0.18));
-    c.fillRect(px + 1, py + 1, Math.max(3, size * 0.18), size - 2);
+    c.fillStyle = "rgba(255,255,255,0.18)";
+    c.fillRect(px + 1, py + 1, size - 2, Math.max(3, size * 0.16));
+    c.fillRect(px + 1, py + 1, Math.max(3, size * 0.16), size - 2);
     // 暗角（右下）
-    c.fillStyle = "rgba(0,0,0,0.32)";
-    c.fillRect(px + 1, py + size - Math.max(3, size * 0.18) - 1, size - 2, Math.max(3, size * 0.18));
-    c.fillRect(px + size - Math.max(3, size * 0.18) - 1, py + 1, Math.max(3, size * 0.18), size - 2);
+    c.fillStyle = "rgba(0,0,0,0.30)";
+    c.fillRect(px + 1, py + size - Math.max(3, size * 0.16) - 1, size - 2, Math.max(3, size * 0.16));
+    c.fillRect(px + size - Math.max(3, size * 0.16) - 1, py + 1, Math.max(3, size * 0.16), size - 2);
     // 内描边
-    c.strokeStyle = "rgba(255,255,255,0.10)";
+    c.strokeStyle = "rgba(255,255,255,0.08)";
     c.lineWidth = 1;
     c.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
   }
 
   function drawGrid() {
     // 背景
-    ctx.fillStyle = "#06060d";
+    ctx.fillStyle = BOARD_BG;
     ctx.fillRect(0, 0, board.width, board.height);
     // 网格线
-    ctx.strokeStyle = "rgba(255,255,255,0.045)";
+    ctx.strokeStyle = "rgba(255,255,255,0.04)";
     ctx.lineWidth = 1;
     for (let x = 0; x <= COLS; x++) {
       ctx.beginPath();
@@ -441,7 +466,7 @@
   }
 
   function drawNext() {
-    nctx.fillStyle = "#06060d";
+    nctx.fillStyle = BOARD_BG;
     nctx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
     if (!next) return;
     const cells = next.cells;
@@ -647,7 +672,7 @@
   grid = emptyGrid();
   drawBoard();
   drawNext();
-  showOverlay("NEON TETRIS", "霓虹俄罗斯方块<br>按空格或下方按钮开始", null, "开始游戏");
+  showOverlay("TETRIS", "俄罗斯方块<br>按空格或下方按钮开始", null, "开始游戏");
 })();
 </script>
 </body>

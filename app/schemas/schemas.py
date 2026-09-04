@@ -125,16 +125,18 @@ class WatchGroupOut(BaseModel):
         from_attributes = True
 
 
-# ===== 可交易期货品种字典 =====
+# ===== 可交易期货「真实合约」字典 =====
 class TradableFutureOut(BaseModel):
-    """国内可交易期货品种条目（给前端下拉框/校验用）"""
-    code: str
-    name: str
-    exchange: str
-    multiplier: float
-    tick_size: float
-    delivery_months: str
-    is_active: bool
+    """国内可交易期货真实合约条目（给前端下拉框/校验用）"""
+    code: str                 # 完整合约代码 nf_RB2701
+    symbol: str               # 不带前缀 RB2701
+    name: str                 # 合约中文名 螺纹钢2701
+    underlying: str           # 品种代码 RB
+    underlying_name: str      # 品种中文名 螺纹钢
+    exchange: str             # SHFE/DCE/CZCE/CFFEX/GFEX
+    multiplier: Optional[float]   # 每点价值
+    tick_size: Optional[float]    # 最小变动价位
+    is_active: bool           # 是否在交易
 
     class Config:
         from_attributes = True

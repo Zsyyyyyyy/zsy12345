@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-国内可交易品种字典路由 —— 行情看板「新增持仓」校验 + 前端下拉框。
+国内可交易期货「真实合约」路由 —— 行情看板「新增持仓」校验 + 前端下拉框。
+
+表 tradable_futures 存的是当前挂牌的真实合约（如 nf_RB2701），
+由 refresh_tradable_futures.py 每天从新浪刷新一次。
 
 接口：
-  GET /api/tradable-futures               列出全部在交易品种（按 exchange、code 排序）
-  GET /api/tradable-futures/{code}        查单个品种
-  POST /api/tradable-futures/validate     校验 code 是否合法（批量），body={"codes":["nf_RB2701",...]}
+  GET  /api/tradable-futures                列出全部在交易合约（可按 underlying 筛选）
+  GET  /api/tradable-futures/{code}         查单个合约
+  POST /api/tradable-futures/validate       校验 code 是否合法（批量），body={"codes":["nf_RB2701",...]}
 
 提供模块级工具函数 `validate_position_code(code, db)` 给 positions.py 复用：
-  - nf_ 前缀 → 解析 underlying + 月份 → 查表 + 校验月份
+  - nf_ 前缀 → 精确匹配表内 is_active 合约，命中才通过
   - hf_/sz/sh/bj/hk 等其他 code → 直接通过（不在校验范围）
 """
-from fastapi import APIRouter, Depends, HTTPException
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,60 +27,34 @@ from app.schemas import TradableFutureOut
 
 router = APIRouter(tags=["tradable-futures"])
 
+# 国内期货 code 形如 nf_<underlying><4位年月>，如 nf_RB2701
+_DOM_CODE_RE = re.compile(r'^nf_([A-Za-z]+)\d{4}$')
+
 
 # ========== 公共工具（供 positions.py 复用） ==========
 
-# 国内期货 code 形如 nf_<underlying><4位月份> 或 nf_<underlying>0
-import re
-_DOM_CODE_RE = re.compile(r'^nf_([A-Za-z]+)(\d{4}|0)$')
-
-# 把 delivery_months 字符串（如 "1,5,10" / "1-12"）解析成 set
-def _parse_months(spec: str) -> set[int]:
-    out: set[int] = set()
-    for part in (spec or '').split(','):
-        part = part.strip()
-        if not part:
-            continue
-        if '-' in part:
-            a, b = part.split('-', 1)
-            out.update(range(int(a), int(b) + 1))
-        else:
-            out.add(int(part))
-    return out
-
-
 def validate_position_code(code: str, db: Session) -> tuple[bool, str | None]:
     """校验持仓 code 是否合法。返回 (ok, 错误信息)。
-    - 其它前缀（hf_/sh/sz/bj/hk）视为通过，让原校验逻辑继续处理
-    - nf_ 但品种/月份不在表里，返回 (False, 错误信息)
+    - nf_ 前缀 → 必须在表内且 is_active，否则拒绝
+    - 其他前缀（hf_/sh/sz/bj/hk）→ 放行（不在本表校验范围）
     """
-    m = _DOM_CODE_RE.match((code or '').strip())
-    if not m:
-        # 非 nf_ 前缀或格式错：不归本表管，调用方自己决定
+    c = (code or '').strip()
+    if not c.startswith('nf_'):
         return True, None
-    underlying, month_tag = m.group(1).upper(), m.group(2)
-    tf = db.scalar(select(TradableFuture).where(TradableFuture.code == underlying))
-    if tf is None or not tf.is_active:
-        return False, f'品种 {underlying} 不在可交易清单中（或已下市）'
-    # month_tag == "0" 表示连续合约，放行
-    if month_tag == '0':
-        return True, None
-    # 4 位月份形如 "2701" = 2027年1月 → 取月份
-    try:
-        month = int(month_tag[2:])  # 2701 -> 01 -> 1
-    except ValueError:
-        return False, f'合约月份格式错误：{month_tag}'
-    if month not in _parse_months(tf.delivery_months):
-        return False, f'{tf.name}({tf.code}) 不在可交割月份（{tf.delivery_months}）中，当前 {month} 月'
+    tf = db.scalar(select(TradableFuture).where(
+        TradableFuture.code == c, TradableFuture.is_active.is_(True)
+    ))
+    if tf is None:
+        return False, f'合约 {c} 不在可交易清单中（可能已到期下架或不存在）'
     return True, None
 
 
 def auto_fill_multiplier(code: str, db: Session) -> float | None:
-    """若持仓未传 multiplier，且 code 是国内期货，则从品种表自动补乘数。"""
-    m = _DOM_CODE_RE.match((code or '').strip())
-    if not m:
+    """若持仓未传 multiplier，且 code 是国内期货，则从合约表自动补乘数。"""
+    c = (code or '').strip()
+    if not c.startswith('nf_'):
         return None
-    tf = db.scalar(select(TradableFuture).where(TradableFuture.code == m.group(1).upper()))
+    tf = db.scalar(select(TradableFuture).where(TradableFuture.code == c))
     return tf.multiplier if tf else None
 
 
@@ -83,22 +62,27 @@ def auto_fill_multiplier(code: str, db: Session) -> float | None:
 
 @router.get("/api/tradable-futures", response_model=list[TradableFutureOut])
 def list_tradable_futures(
+    underlying: str | None = Query(None, description="按品种代码筛选，如 RB"),
     active_only: bool = True,
     db: Session = Depends(get_db),
 ):
-    """列出全部在交易品种。前端拿去做下拉框或校验。"""
-    stmt = select(TradableFuture).order_by(TradableFuture.exchange, TradableFuture.code)
+    """列出全部在交易合约。前端拿下拉框/联想，或按品种筛选。"""
+    stmt = select(TradableFuture).order_by(
+        TradableFuture.exchange, TradableFuture.underlying, TradableFuture.symbol
+    )
     if active_only:
         stmt = stmt.where(TradableFuture.is_active.is_(True))
+    if underlying:
+        stmt = stmt.where(TradableFuture.underlying == underlying.upper())
     return db.scalars(stmt).all()
 
 
 @router.get("/api/tradable-futures/{code}", response_model=TradableFutureOut)
 def get_tradable_future(code: str, db: Session = Depends(get_db)):
-    """查单个品种。"""
+    """查单个合约（传完整 code 如 nf_RB2701）。"""
     tf = db.scalar(select(TradableFuture).where(TradableFuture.code == code.upper()))
     if tf is None:
-        raise HTTPException(status_code=404, detail="品种不存在")
+        raise HTTPException(status_code=404, detail="合约不存在")
     return tf
 
 

@@ -280,7 +280,8 @@
         <button class="close-btn" id="posClose">×</button>
       </div>
       <div class="pos-form">
-        <label><span>代码</span><input id="posCode" placeholder="nf_RB2701" autocomplete="off"></label>
+        <label><span>代码</span><input id="posCode" placeholder="搜索合约，如 RB2701" autocomplete="off" list="contractOptions"></label>
+        <datalist id="contractOptions"></datalist>
         <label><span>方向</span><select id="posDir">
           <option value="long">做多（买涨）</option>
           <option value="short">做空（买跌）</option>
@@ -809,6 +810,25 @@
 
   // ===== 持仓增删改 =====
   let editingPosId = null; // 当前编辑的持仓 id（null = 新增）
+  // 真实合约联想：懒加载一次，之后复用缓存
+  let contractOptionsLoaded = false;
+  async function loadContractOptions() {
+    if (contractOptionsLoaded) return;
+    try {
+      const resp = await fetch('/api/tradable-futures');
+      const list = await resp.json();
+      const dl = document.getElementById('contractOptions');
+      const frag = document.createDocumentFragment();
+      (list || []).forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.symbol;   // RB2701（不带前缀，normalizeCode 会补 nf_）
+        opt.label = c.name;     // 螺纹钢2701
+        frag.appendChild(opt);
+      });
+      dl.appendChild(frag);
+      contractOptionsLoaded = true;
+    } catch (e) { /* 拉不到联想也不影响手动输入 + 后端校验兜底 */ }
+  }
   function openPosForm(pos) {
     editingPosId = pos ? pos.id : null;
     posTitle.textContent = pos ? '修改持仓' : '新增持仓';
@@ -821,6 +841,7 @@
     posMsg.textContent = '';
     posMask.classList.add('show');
     posCode.focus();
+    loadContractOptions();
   }
   function closePosForm() { posMask.classList.remove('show'); }
   // ===== 登录态：读 token、拼 Authorization 头、401 跳登录页 =====

@@ -42,9 +42,9 @@ def create_position(
 ):
     """新增持仓。允许同一品种建多条（如分批建仓），不校验 code 唯一性。
 
-    校验：若 code 以 `nf_` 开头（国内期货），必须在 tradable_futures 表内 + 月份合法，
-    否则返回 400。海外期货/股票/港股不在此校验范围。
-    自动补乘数：若请求未传，国内期货自动从品种表取 multiplier。
+    校验：若 code 以 `nf_` 开头（国内期货），必须精确命中 tradable_futures 表内
+    的在交易真实合约（如 nf_RB2701），否则返回 400。海外期货/股票/港股不在此校验范围。
+    自动补乘数：若请求未传，国内期货自动从合约表取 multiplier。
     """
     ok, err = validate_position_code(data.code, db)
     if not ok:

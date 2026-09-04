@@ -19,25 +19,29 @@ class User(Base):
 
 
 class TradableFuture(Base):
-    """国内可交易期货品种字典（全局共享，按品种 underlying 主键）。
+    """国内可交易期货「真实合约」字典（全局共享，按完整合约主键）。
 
-    持仓接口用此表校验新增持仓：code 形如 `nf_<underlying><4位月份>`
-    或 `nf_<underlying>0`（连续合约），要求 underlying 在表里 + 月份在
-    delivery_months 列表里。海外期货/股票/港股不走此校验。
+    不再存品种 underlying（如 RB），而是存当前挂牌的真实合约（如 nf_RB2701），
+    由 refresh_tradable_futures.py 每天从新浪拉取一次刷新。持仓接口据此校验：
+    code 以 nf_ 开头时必须精确命中表内 is_active 合约；海外期货/股票/港股不走此校验。
+
+    字段说明：
+    - code：带前缀完整合约代码（如 nf_RB2701），与 positions.code 一致，作主键
+    - symbol：不带前缀（如 RB2701），方便展示与前端联想
+    - underlying / underlying_name：品种代码（RB）/ 品种中文名（螺纹钢），用于分组
+    - multiplier / tick_size：品种级属性（每点价值/最小变动），刷新时按品种字典填充
     """
     __tablename__ = "tradable_futures"
 
-    code: Mapped[str] = mapped_column(String(16), primary_key=True, comment="品种 underlying（如 RB/CU/SA）")
-    name: Mapped[str] = mapped_column(String(50), nullable=False, comment="中文名（螺纹钢/铜/纯碱）")
-    exchange: Mapped[str] = mapped_column(String(8), nullable=False, comment="交易所 SHFE/DCE/CZCE/GFEX/INE")
-    multiplier: Mapped[float] = mapped_column(Float, nullable=False, comment="合约乘数（每点价值，元）")
-    tick_size: Mapped[float] = mapped_column(Float, nullable=False, default=1.0, comment="最小变动价位")
-    delivery_months: Mapped[str] = mapped_column(
-        String(48), nullable=False, default="",
-        comment="可交割月份，逗号分隔（如 '1,5,10' 或 '1-12'）",
-    )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="是否仍在交易（下市品种置 False 但保留历史）")
-    note: Mapped[str | None] = mapped_column(String(200), nullable=True, comment="备注（如上市/下市日期）")
+    code: Mapped[str] = mapped_column(String(20), primary_key=True, comment="完整合约代码（如 nf_RB2701）")
+    symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="不带前缀合约代码（如 RB2701）")
+    name: Mapped[str] = mapped_column(String(50), nullable=False, comment="合约中文名（如 螺纹钢2701）")
+    underlying: Mapped[str] = mapped_column(String(8), nullable=False, index=True, comment="品种代码（如 RB）")
+    underlying_name: Mapped[str] = mapped_column(String(50), nullable=False, default="", comment="品种中文名（如 螺纹钢）")
+    exchange: Mapped[str] = mapped_column(String(8), nullable=False, comment="交易所 SHFE/DCE/CZCE/CFFEX/GFEX")
+    multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="合约乘数（每点价值，元；新品种可能为空）")
+    tick_size: Mapped[float | None] = mapped_column(Float, nullable=True, comment="最小变动价位")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True, comment="是否仍在交易（到期/下架合约置 False 保留历史）")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"

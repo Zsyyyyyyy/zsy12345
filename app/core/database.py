@@ -8,7 +8,7 @@ load_dotenv()
 # MySQL 连接串：mysql+pymysql://用户:密码@主机:端口/库名
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql+pymysql://root:123456@127.0.0.1:3306/fastapi_auth",
+    "mysql+pymysql://root:123456@127.0.0.1:3306/zsy12345",
 )
 
 engine = create_engine(DATABASE_URL, echo=True, pool_pre_ping=True)

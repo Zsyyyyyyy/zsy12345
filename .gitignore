@@ -31,5 +31,3 @@ logs/
 .DS_Store
 
 # ===== 数据库导出（含用户邮箱/密码哈希等数据，严禁提交） =====
-fastapi_auth.sql
-dump*.sql

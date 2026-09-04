@@ -1054,17 +1054,21 @@
       const list = await resp.json();
       historySub.textContent = '共 ' + list.length + ' 笔';
       if (!list.length) { historyBody.innerHTML = '<div class="flat" style="padding:8px;">暂无结算记录</div>'; return; }
-      let html = '<table class="settle-table"><thead><tr><th>品种</th><th>方向</th><th>开仓价</th><th>结算价</th><th>手数</th><th>盈亏</th><th>时间</th></tr></thead><tbody>';
+      let html = '<table class="settle-table"><thead><tr><th>品种</th><th>方向</th><th>开仓价</th><th>结算价</th><th>价差</th><th>手数</th><th>盈亏</th><th>时间</th></tr></thead><tbody>';
       list.forEach((s) => {
         const cls = s.pnl > 0 ? 'up' : s.pnl < 0 ? 'down' : 'flat';
         const dir = dirOf(s);
         const nm = s.name || s.code;
         const t = String(s.settled_at || '').replace('T', ' ').slice(0, 19);
+        // 价差：优先用后端落库的 spread（已按方向取正负），老数据回退前端计算
+        const sp = (typeof s.spread === 'number') ? s.spread : diffOf(s.settle_price, s.buy_price, dir);
+        const spCls = isNaN(sp) ? 'flat' : sp > 0 ? 'up' : sp < 0 ? 'down' : 'flat';
         html += '<tr>' +
           '<td class="name" title="' + s.code + '">' + nm + '</td>' +
           `<td class="${dir === 'short' ? 'down' : 'up'}">${dirLabel(dir)}</td>` +
           '<td>' + fmtNum(s.buy_price) + '</td>' +
           '<td>' + fmtNum(s.settle_price) + '</td>' +
+          '<td class="' + spCls + '">' + (isNaN(sp) ? '--' : (sp > 0 ? '+' : '') + fmtNum(sp)) + '</td>' +
           '<td>' + s.lots + '</td>' +
           '<td class="' + cls + '">' + (s.pnl > 0 ? '+' : '') + fmtNum(s.pnl, 0) + ' ' + currencyLabel(s.currency) + '</td>' +
           '<td class="flat">' + t + '</td>' +

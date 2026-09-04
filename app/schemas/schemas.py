@@ -123,3 +123,18 @@ class WatchGroupOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ===== 可交易期货品种字典 =====
+class TradableFutureOut(BaseModel):
+    """国内可交易期货品种条目（给前端下拉框/校验用）"""
+    code: str
+    name: str
+    exchange: str
+    multiplier: float
+    tick_size: float
+    delivery_months: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True

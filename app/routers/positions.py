@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import Position, User
+from app.routers.tradable_futures import validate_position_code, auto_fill_multiplier
 from app.schemas import PositionCreate, PositionUpdate, PositionOut
 
 router = APIRouter(tags=["positions"])
@@ -39,14 +40,27 @@ def create_position(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """新增持仓。允许同一品种建多条（如分批建仓），不校验 code 唯一性。"""
+    """新增持仓。允许同一品种建多条（如分批建仓），不校验 code 唯一性。
+
+    校验：若 code 以 `nf_` 开头（国内期货），必须在 tradable_futures 表内 + 月份合法，
+    否则返回 400。海外期货/股票/港股不在此校验范围。
+    自动补乘数：若请求未传，国内期货自动从品种表取 multiplier。
+    """
+    ok, err = validate_position_code(data.code, db)
+    if not ok:
+        raise HTTPException(status_code=400, detail=err)
+
+    multiplier = data.multiplier
+    if multiplier is None:
+        multiplier = auto_fill_multiplier(data.code, db)
+
     pos = Position(
         user_id=user.id,
         code=data.code,
         direction=data.direction,
         buy_price=data.buy_price,
         lots=data.lots,
-        multiplier=data.multiplier,
+        multiplier=multiplier,
     )
     db.add(pos)
     db.commit()
@@ -61,12 +75,21 @@ def update_position(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """修改持仓。仅更新显式传入的字段；不校验 code 唯一性（允许同品种多条）。"""
+    """修改持仓。仅更新显式传入的字段；不校验 code 唯一性（允许同品种多条）。
+
+    若传入新 code，按与 create 一致的逻辑校验国内期货合法性。
+    """
     pos = db.scalar(select(Position).where(Position.id == pos_id, Position.user_id == user.id))
     if pos is None:
         raise HTTPException(status_code=404, detail="持仓不存在")
 
     updates = data.model_dump(exclude_unset=True)
+
+    # code 改了：先校验，校验通过后再写
+    if 'code' in updates and updates['code'] != pos.code:
+        ok, err = validate_position_code(updates['code'], db)
+        if not ok:
+            raise HTTPException(status_code=400, detail=err)
 
     for field, value in updates.items():
         setattr(pos, field, value)

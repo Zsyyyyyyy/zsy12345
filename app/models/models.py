@@ -18,6 +18,32 @@ class User(Base):
     )
 
 
+class TradableFuture(Base):
+    """国内可交易期货品种字典（全局共享，按品种 underlying 主键）。
+
+    持仓接口用此表校验新增持仓：code 形如 `nf_<underlying><4位月份>`
+    或 `nf_<underlying>0`（连续合约），要求 underlying 在表里 + 月份在
+    delivery_months 列表里。海外期货/股票/港股不走此校验。
+    """
+    __tablename__ = "tradable_futures"
+
+    code: Mapped[str] = mapped_column(String(16), primary_key=True, comment="品种 underlying（如 RB/CU/SA）")
+    name: Mapped[str] = mapped_column(String(50), nullable=False, comment="中文名（螺纹钢/铜/纯碱）")
+    exchange: Mapped[str] = mapped_column(String(8), nullable=False, comment="交易所 SHFE/DCE/CZCE/GFEX/INE")
+    multiplier: Mapped[float] = mapped_column(Float, nullable=False, comment="合约乘数（每点价值，元）")
+    tick_size: Mapped[float] = mapped_column(Float, nullable=False, default=1.0, comment="最小变动价位")
+    delivery_months: Mapped[str] = mapped_column(
+        String(48), nullable=False, default="",
+        comment="可交割月份，逗号分隔（如 '1,5,10' 或 '1-12'）",
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="是否仍在交易（下市品种置 False 但保留历史）")
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True, comment="备注（如上市/下市日期）")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"
+    )
+
+
 class Position(Base):
     """期货/股票持仓（行情看板「我的持仓」，按用户隔离；同一品种可建多条）"""
     __tablename__ = "positions"

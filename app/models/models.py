@@ -68,6 +68,10 @@ class Settlement(Base):
     name: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="品种名称快照")
     buy_price: Mapped[float] = mapped_column(Float, nullable=False, comment="开仓价快照")
     settle_price: Mapped[float] = mapped_column(Float, nullable=False, comment="结算价")
+    spread: Mapped[float] = mapped_column(
+        Float, default=0.0, nullable=False,
+        comment="按方向价差（做多=结算价-开仓价，做空=开仓价-结算价），便于历史表直接显示",
+    )
     lots: Mapped[float] = mapped_column(Float, default=1.0, nullable=False, comment="手数")
     multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="每点价值快照")
     pnl: Mapped[float] = mapped_column(Float, nullable=False, comment="盈亏（已按方向计：多=(结算价-开仓价)，空=(开仓价-结算价)，再×手数×乘数）")

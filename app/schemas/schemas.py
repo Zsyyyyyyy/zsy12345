@@ -69,12 +69,15 @@ class PositionOut(BaseModel):
 
 # ===== 结算 =====
 class SettlementCreate(BaseModel):
-    """结算持仓：只需结算价，其余字段（名称/币种/乘数）可选，后端会从持仓快照兜底"""
+    """结算持仓：只需结算价，其余字段（名称/币种/乘数/手数）可选，后端会从持仓快照兜底。
+    手数 `lots` 不传或传 None 视为按该持仓剩余手数全部结算；传值需满足 0 < lots <= 持仓手数。
+    """
     settle_price: float
     direction: Optional[str] = Field(None, pattern=DIRECTION_PATTERN, description="可选，缺省用持仓的方向")
     name: Optional[str] = None
     currency: Optional[str] = None
     multiplier: Optional[float] = None
+    lots: Optional[float] = Field(None, gt=0, description="本次结算手数；缺省=全部")
 
 
 class SettlementOut(BaseModel):
@@ -84,6 +87,7 @@ class SettlementOut(BaseModel):
     name: Optional[str]
     buy_price: float
     settle_price: float
+    spread: float
     lots: float
     multiplier: Optional[float]
     pnl: float

@@ -18,7 +18,7 @@
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -39,13 +39,18 @@ def validate_position_code(code: str, db: Session) -> tuple[bool, str | None]:
     - 其他前缀（hf_/sh/sz/bj/hk）→ 放行（不在本表校验范围）
     """
     c = (code or '').strip()
-    if not c.startswith('nf_'):
+    if c.startswith('nf_'):
+        tf = db.scalar(select(TradableFuture).where(
+            TradableFuture.code == c, TradableFuture.is_active.is_(True)
+        ))
+        if tf is None:
+            return False, f'合约 {c} 不在可交易清单中（可能已到期下架或不存在）'
         return True, None
-    tf = db.scalar(select(TradableFuture).where(
-        TradableFuture.code == c, TradableFuture.is_active.is_(True)
-    ))
-    if tf is None:
-        return False, f'合约 {c} 不在可交易清单中（可能已到期下架或不存在）'
+    # 纯字母（1~4 位）：可能是国内品种名（如 RB），缺月份，无法精确对应合约，
+    # 直接拒绝，避免被前端归一化成海外期货而误放行。
+    if re.fullmatch(r'[A-Za-z]{1,4}', c):
+        return False, f'「{c}」只是品种名，请填写完整合约代码（如 RB2701）或从联想列表选择'
+    # 其他前缀（hf_/sh/sz/bj/hk/6位数字）→ 放行（不在本表校验范围）
     return True, None
 
 
@@ -74,6 +79,45 @@ def list_tradable_futures(
         stmt = stmt.where(TradableFuture.is_active.is_(True))
     if underlying:
         stmt = stmt.where(TradableFuture.underlying == underlying.upper())
+    return db.scalars(stmt).all()
+
+
+@router.get("/api/tradable-futures/search", response_model=list[TradableFutureOut])
+def search_tradable_futures(
+    key: str = Query("", description="关键字：匹配 symbol/name/underlying/code"),
+    limit: int = Query(30, ge=1, le=100, description="最多返回条数"),
+    db: Session = Depends(get_db),
+):
+    """按关键字搜索可交易合约（新增持仓联想）。空关键字返回空列表。
+
+    匹配优先级：symbol 前缀命中（如 RB -> RB2701...）排最前，其余按
+    交易所/品种/合约排序。
+    """
+    kw = (key or '').strip()
+    if not kw:
+        return []
+    like = f"%{kw.upper()}%"
+    name_like = f"%{kw}%"
+    prefix_like = f"{kw.upper()}%"
+    stmt = (
+        select(TradableFuture)
+        .where(TradableFuture.is_active.is_(True))
+        .where(or_(
+            TradableFuture.symbol.ilike(like),
+            TradableFuture.code.ilike(like),
+            TradableFuture.underlying.ilike(like),
+            TradableFuture.name.ilike(name_like),
+            TradableFuture.underlying_name.ilike(name_like),
+        ))
+        .order_by(
+            # symbol 前缀命中（含完全相等）优先，其余靠后
+            TradableFuture.symbol.ilike(prefix_like).desc(),
+            TradableFuture.exchange,
+            TradableFuture.underlying,
+            TradableFuture.symbol,
+        )
+        .limit(limit)
+    )
     return db.scalars(stmt).all()
 
 

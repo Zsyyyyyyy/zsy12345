@@ -172,6 +172,11 @@
   .pos-form label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .pos-form label span { width: 84px; text-align: right; flex-shrink: 0; }
   .pos-form input, .pos-form select { flex: 1; width: auto; }
+  .pos-code-row { position: relative; }
+  .pos-code-row label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .pos-code-row label span { width: 84px; text-align: right; flex-shrink: 0; }
+  .pos-code-row input { flex: 1; width: auto; }
+  .pos-suggest { top: 30px; left: 92px; right: 0; width: auto; max-height: 240px; }
   .pos-form .row-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
   .pos-form .row-btns .primary { color: var(--accent); border-color: var(--accent); }
   .pos-form .msg { color: var(--up); font-size: 11px; min-height: 14px; }
@@ -280,8 +285,10 @@
         <button class="close-btn" id="posClose">×</button>
       </div>
       <div class="pos-form">
-        <label><span>代码</span><input id="posCode" placeholder="搜索合约，如 RB2701" autocomplete="off" list="contractOptions"></label>
-        <datalist id="contractOptions"></datalist>
+        <div class="pos-code-row">
+          <label><span>代码</span><input id="posCode" placeholder="输入关键字搜索合约，如 RB / 螺纹钢" autocomplete="off"></label>
+          <div class="suggest pos-suggest" id="posSuggestBox"></div>
+        </div>
         <label><span>方向</span><select id="posDir">
           <option value="long">做多（买涨）</option>
           <option value="short">做空（买跌）</option>
@@ -479,6 +486,26 @@
     }
     if (/^[A-Z]+\d/.test(s)) return 'nf_' + s;
     return 'hf_' + s;
+  }
+  // 持仓专用代码规范化：与 normalizeCode 的唯一区别是——纯字母（品种名，如 RB）不归一化
+  // 成海外期货，而是返回空串，由调用方提示填写完整合约，从而避免「RB 被当成 hf_RB 放行」。
+  function normalizePosCode(raw) {
+    let s = String(raw || '').trim().toUpperCase();
+    if (!s) return '';
+    if (/^NF_/.test(s)) return s.replace(/^NF_/, 'nf_');
+    if (/^HF_/.test(s)) return s.replace(/^HF_/, 'hf_');
+    if (/^(SH|SZ|BJ)\d/.test(s)) return s.toLowerCase();
+    if (/^HK/.test(s)) return 'hk' + s.slice(2);
+    if (/^\d{6}$/.test(s)) {
+      if (SH_INDEX_TAIL.test(s)) return 'sh' + s;
+      if (/^[56]/.test(s)) return 'sh' + s;
+      if (/^[03]/.test(s)) return 'sz' + s;
+      return 'bj' + s;
+    }
+    // 国内期货完整合约：字母 + 3~4 位数字（RB2701）
+    if (/^[A-Z]{1,4}\d{3,4}$/.test(s)) return 'nf_' + s;
+    // 其余（纯字母品种名 RB/OIL 等）→ 返回空，要求明确填写
+    return '';
   }
   // groupName 省略时按代码类型自动归类；返回是否添加成功
   async function addCode(code, groupName) {
@@ -810,25 +837,42 @@
 
   // ===== 持仓增删改 =====
   let editingPosId = null; // 当前编辑的持仓 id（null = 新增）
-  // 真实合约联想：懒加载一次，之后复用缓存
-  let contractOptionsLoaded = false;
-  async function loadContractOptions() {
-    if (contractOptionsLoaded) return;
-    try {
-      const resp = await fetch('/api/tradable-futures');
-      const list = await resp.json();
-      const dl = document.getElementById('contractOptions');
-      const frag = document.createDocumentFragment();
-      (list || []).forEach((c) => {
-        const opt = document.createElement('option');
-        opt.value = c.symbol;   // RB2701（不带前缀，normalizeCode 会补 nf_）
-        opt.label = c.name;     // 螺纹钢2701
-        frag.appendChild(opt);
-      });
-      dl.appendChild(frag);
-      contractOptionsLoaded = true;
-    } catch (e) { /* 拉不到联想也不影响手动输入 + 后端校验兜底 */ }
+  // 真实合约联想：输入关键字 -> 调搜索接口 -> 下拉显示可交易合约
+  const posSuggestBox = document.getElementById('posSuggestBox');
+  let posSuggestTimer = null;
+  function hidePosSuggest() { posSuggestBox.classList.remove('show'); }
+  function searchPosContract(kw) {
+    clearTimeout(posSuggestTimer);
+    if (!kw) { hidePosSuggest(); return; }
+    posSuggestTimer = setTimeout(async () => {
+      try {
+        const resp = await fetch('/api/tradable-futures/search?key=' + encodeURIComponent(kw));
+        const list = await resp.json();
+        renderPosSuggest(list || []);
+      } catch (e) { hidePosSuggest(); }
+    }, 250);
   }
+  function renderPosSuggest(list) {
+    if (!list.length) { hidePosSuggest(); return; }
+    posSuggestBox.innerHTML = '';
+    list.forEach((c) => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.innerHTML =
+        `<span class="nm">${c.name}</span><span class="cd">${c.symbol}</span><span class="mk">${c.exchange}</span>`;
+      div.addEventListener('click', () => {
+        posCode.value = c.symbol;   // RB2701（不带前缀，保存时补 nf_）
+        hidePosSuggest();
+      });
+      posSuggestBox.appendChild(div);
+    });
+    posSuggestBox.classList.add('show');
+  }
+  posCode.addEventListener('input', () => searchPosContract(posCode.value.trim()));
+  document.addEventListener('click', (e) => {
+    if (!posSuggestBox.contains(e.target) && e.target !== posCode) hidePosSuggest();
+  });
+
   function openPosForm(pos) {
     editingPosId = pos ? pos.id : null;
     posTitle.textContent = pos ? '修改持仓' : '新增持仓';
@@ -840,8 +884,8 @@
     posMult.value = (pos && pos.multiplier != null) ? pos.multiplier : '';
     posMsg.textContent = '';
     posMask.classList.add('show');
+    hidePosSuggest();
     posCode.focus();
-    loadContractOptions();
   }
   function closePosForm() { posMask.classList.remove('show'); }
   // ===== 登录态：读 token、拼 Authorization 头、401 跳登录页 =====
@@ -880,11 +924,11 @@
   }
 
   async function savePos() {
-    const code = normalizeCode(posCode.value);
+    const code = normalizePosCode(posCode.value);
     const buyRaw = posBuy.value.trim();
     const lotsRaw = posLots.value.trim();
     const multRaw = posMult.value.trim();
-    if (!code) { posMsg.textContent = '请输入代码'; return; }
+    if (!code) { posMsg.textContent = '请输入完整合约代码（如 RB2701），或从联想列表选择'; return; }
     const buy = Number(buyRaw);
     if (buyRaw === '' || isNaN(buy)) { posMsg.textContent = '请输入买入价'; return; }
     const lots = Number(lotsRaw);

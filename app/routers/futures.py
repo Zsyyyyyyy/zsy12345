@@ -3,7 +3,7 @@
 """
 期货行情代理路由 —— 整合进 FastAPI 主后端。
 
-原 modules/futures/server.py 的转发逻辑原样搬到这里：
+转发新浪行情接口：
   - 补 Referer（新浪 hq.sinajs.cn 严格校验 Referer，否则 403）
   - GB18030 -> UTF-8 转码
   - 港股代码自动加 rt_ 前缀拿实时行情
@@ -36,7 +36,7 @@ router = APIRouter(tags=["futures"])
 # hq.sinajs.cn 单行：var hq_str_<code>="f1,f2,...,fN";
 _HQ_LINE_RE = re.compile(r'var\s+hq_str_([A-Za-z0-9_$.]+?)="(.*?)"\s*;?', re.DOTALL)
 
-# 股指期货/国债期货识别（与原前端 parseSina 一致）
+# 股指期货/国债期货识别
 _INDEX_FUTURE_RE = re.compile(r'^nf_(IF|IH|IC|IM|TF|TS|T\d|TL)')
 
 

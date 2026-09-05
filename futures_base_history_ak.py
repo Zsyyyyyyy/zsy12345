@@ -42,7 +42,7 @@ from sqlalchemy import select
 
 from app.core.database import Base, engine, SessionLocal
 from app.models import FuturesBase
-from app.routers.data import MULTIPLIERS
+from app.fetchutils import MULTIPLIERS
 
 # 默认启用的交易所（akshare 可用）；DCE 当前坏、GFEX 源空，默认跳过
 DEFAULT_MARKETS = ['SHFE', 'CZCE', 'CFFEX', 'INE']

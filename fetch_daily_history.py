@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.core.database import Base, engine, SessionLocal
-from app.routers.data import run_fetch_history
+from app.routers.history import run_fetch_history
 
 
 def main():

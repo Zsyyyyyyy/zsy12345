@@ -44,7 +44,7 @@ from sqlalchemy import select
 
 from app.core.database import Base, engine, SessionLocal
 from app.models import FuturesBase
-from app.routers.data import KLINE_URL, MULTIPLIERS, http_get, parse_jsonp
+from app.fetchutils import KLINE_URL, MULTIPLIERS, http_get, parse_jsonp
 
 # 连续合约/具体合约之外的 symbol 判定（探测用）：字母 + 4 位年月
 def probe_has_kline(symbol: str) -> bool:

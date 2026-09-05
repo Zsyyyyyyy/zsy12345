@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import Position, User
-from app.routers.futures_base import validate_position_code, auto_fill_multiplier
+from app.routers.history import validate_position_code, auto_fill_multiplier
 from app.schemas import PositionCreate, PositionUpdate, PositionOut
 
 router = APIRouter(tags=["positions"])

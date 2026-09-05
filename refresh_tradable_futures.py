@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.core.database import Base, engine, SessionLocal
-from app.routers.data import refresh_contracts
+from app.routers.history import refresh_contracts
 
 
 def main():

@@ -121,6 +121,11 @@
   th:first-child, td:first-child { text-align: left; }
   td { border-bottom: 1px solid var(--line); }
   tr:hover td { background: var(--line); }
+  /* 看盘行情表列对齐：# 居中；名称(2)/代码(3) 表头与内容一起左对齐；数字列右对齐 */
+  .quote-table th:nth-child(2), .quote-table td:nth-child(2),
+  .quote-table th:nth-child(3), .quote-table td:nth-child(3) { text-align: left; }
+  /* 持仓表：名称列(2) 表头跟随内容左对齐 */
+  .pos-table th:nth-child(2), .pos-table td:nth-child(2) { text-align: left; }
   .name { color: var(--text); cursor: pointer; text-align: left; }
   .name:hover { color: var(--accent); }
   td.num, th.num { text-align: center; }
@@ -661,6 +666,7 @@
       h.textContent = g.name;
       sec.appendChild(h);
       const table = document.createElement('table');
+      table.className = 'quote-table';
       table.innerHTML =
         '<thead><tr><th class="num">#</th><th>名称</th><th>代码</th><th>现价</th><th>涨跌</th><th>涨跌幅</th>' +
         '<th>时间</th><th></th></tr></thead><tbody></tbody>';
@@ -776,7 +782,7 @@
       '<button class="sort-btn" id="historyBtn">结算记录</button>' +
       '<button class="sort-btn" id="sortBtn">盈亏' + (sortDesc ? ' ↓' : ' ↑') + '</button>' +
       '<button class="sort-btn" id="addPosBtn">+ 新增</button></div></div>';
-    html += '<table><thead><tr><th class="num">#</th><th>名称</th><th>方向</th><th>现价</th><th>开仓价</th><th>价差</th><th>手数</th><th>盈亏</th><th></th></tr></thead><tbody>';
+    html += '<table class="pos-table"><thead><tr><th class="num">#</th><th>名称</th><th>方向</th><th>现价</th><th>开仓价</th><th>价差</th><th>手数</th><th>盈亏</th><th></th></tr></thead><tbody>';
     if (!sorted.length) {
       html += '<tr><td colspan="9" class="flat">暂无持仓，点右上角「+ 新增」添加</td></tr>';
     } else {

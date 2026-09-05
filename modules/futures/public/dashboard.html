@@ -516,7 +516,7 @@
   // groupName 省略时按代码类型自动归类；返回是否添加成功
   async function addCode(code, groupName) {
     code = normalizeCode(code);
-    if (!code || allCodes().includes(code)) return false;
+    if (!code || groupCodes().includes(code)) return false;
     const name = groupName || groupNameFor(code);
     const g = configGroups && configGroups.find((x) => x.name === name);
     try {
@@ -557,7 +557,7 @@
     addConfirm.disabled = false;
     // 分组下拉框按代码类型预选，用户可在弹窗里自行改成任意分组
     addGroupSel.value = groupNameFor(code);
-    if (allCodes().includes(code)) {
+    if (groupCodes().includes(code)) {
       addMsg.textContent = '该品种已在看盘清单中';
       addConfirm.disabled = true;
     }
@@ -577,7 +577,7 @@
     renderAddInfo(code, d, fallbackName);
   }
   function renderAddInfo(code, d, fallbackName) {
-    let html = '名称：<b>' + ((d && d.name) || fallbackName || '--') + '</b>（' + code + '）<br>' +
+    let html = '名称：<b>' + ((d && d.name) || fallbackName || '--') + '</b>（' + fmtCode(code) + '）<br>' +
       '类型：<b>' + groupNameFor(code) + '</b>';
     if (d && !isNaN(Number(d.price)) && Number(d.price) !== 0) {
       const price = Number(d.price), yest = Number(d.yestclose);
@@ -596,7 +596,7 @@
   function closeAddForm() { addMask.classList.remove('show'); pendingCode = null; }
   async function confirmAdd() {
     if (!pendingCode) return;
-    if (allCodes().includes(pendingCode)) { addMsg.textContent = '该品种已在看盘清单中'; return; }
+    if (groupCodes().includes(pendingCode)) { addMsg.textContent = '该品种已在看盘清单中'; return; }
     const ok = await addCode(pendingCode, addGroupSel.value);
     if (ok) closeAddForm();
   }
@@ -618,9 +618,14 @@
     }
   }
   function allCodes() {
+    // 拉行情用全集：看盘分组 ∪ 持仓（持仓行也要现价算盈亏）
     const base = allGroups().reduce((acc, g) => acc.concat(g.codes), []);
     const pos = (configPositions || []).map((p) => p.code).filter(Boolean);
     return Array.from(new Set(base.concat(pos)));
+  }
+  function groupCodes() {
+    // 左侧「看盘清单」里的代码（判断是否已加分组只能用这个，持仓不算）
+    return Array.from(new Set(allGroups().reduce((acc, g) => acc.concat(g.codes), [])));
   }
 
   // ===== 格式化 =====

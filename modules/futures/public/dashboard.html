@@ -461,6 +461,7 @@
   applyGray(gray);
 
   let timer = null;
+  let loadSeq = 0;       // 防止刷新期间并发请求按旧顺序覆盖新行情
   let lastDataMap = {};
   let configGroups = null; // 服务端看盘分组（null = 尚未加载，先用默认）
   let configPositions = []; // 持仓（来自数据库 /api/positions）
@@ -1447,12 +1448,20 @@
 
   // ===== 行情加载 =====
   async function load() {
+    const requestSeq = ++loadSeq;
     const codes = allCodes();
-    if (!codes.length) { render({}); updateTime.textContent = '无数据'; return; }
+    if (!codes.length) {
+      if (requestSeq !== loadSeq) return;
+      render({});
+      updateTime.textContent = '无数据';
+      return;
+    }
     try {
       const resp = await fetch('/api/futures?codes=' + encodeURIComponent(codes.join(',')));
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const json = await resp.json();
+      // 配置/定时刷新期间可能同时发起多次请求，旧响应不能覆盖新响应
+      if (requestSeq !== loadSeq) return;
       const list = json.items || [];
       const map = {};
       list.forEach((it) => { map[it.code] = it; });
@@ -1461,6 +1470,7 @@
       banner.style.display = 'none';
       updateTime.textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
     } catch (e) {
+      if (requestSeq !== loadSeq) return;
       banner.style.display = 'block';
       updateTime.textContent = '连接失败';
     }
@@ -1495,7 +1505,7 @@
   });
 
   // ===== 配置文件实时同步 =====
-  async function loadConfig(force) {
+  async function loadConfig(force, triggerLoad = true) {
     try {
       const resp = await fetch('/api/groups?t=' + Date.now(), { headers: authHeaders() });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1508,13 +1518,13 @@
               name: String(g.name || '未命名'),
               codes: (Array.isArray(g.codes) ? g.codes : []).map(normalizeCode).filter(Boolean),
             }));
-        load();
+        if (triggerLoad) load();
       }
     } catch (e) {
       // 拉取失败时沿用默认分组
     }
   }
-  async function loadPositions() {
+  async function loadPositions(triggerLoad = true) {
     // 持仓来自数据库 /api/positions，不再读 config.json
     try {
       const resp = await fetch('/api/positions', { headers: authHeaders() });
@@ -1533,14 +1543,20 @@
     } catch (e) {
       configPositions = [];
     }
-    load();
+    if (triggerLoad) load();
+  }
+
+  async function initialLoad() {
+    // 首次刷新先同时加载分组和持仓，等两者就绪后只发起一次行情请求。
+    // 避免默认分组/旧请求的响应把 RB2703 等自定义合约覆盖掉。
+    await Promise.all([loadPositions(false), loadConfig(true, false)]);
+    await load();
   }
 
   setupTimer();
   initNav();
   bindLogout();
-  loadPositions();
-  loadConfig(true);
+  initialLoad();
   setInterval(() => loadConfig(false), CONFIG_POLL_MS);
 })();
 </script>

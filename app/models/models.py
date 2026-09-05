@@ -28,8 +28,8 @@ class FuturesBase(Base):
     - is_active=0：已退市合约（含 build_futures_base_history.py 从新浪逐月探测
       补进来的近约 5~7 年历史合约），保留用于历史持仓校验与历史行情对照。
 
-    持仓接口据此校验：code 以 nf_ 开头时必须命中 is_active 合约；
-    海外期货/股票/港股不走此校验。fetch_daily_history.py 默认抓取本表全部具体合约
+    持仓接口据此校验：code 必须为 nf_ 开头且命中 is_active 合约；
+    海外期货/港股/A股 已下线，不再纳入持仓。fetch_daily_history.py 默认抓取本表全部具体合约
     （含已下架）的日级历史行情。
 
     字段说明：
@@ -56,12 +56,12 @@ class FuturesBase(Base):
 
 
 class Position(Base):
-    """期货/股票持仓（行情看板「我的持仓」，按用户隔离；同一品种可建多条）"""
+    """国内期货持仓（行情看板「我的持仓」，按用户隔离；同一品种可建多条）"""
     __tablename__ = "positions"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="所属用户 id")
-    code: Mapped[str] = mapped_column(String(32), nullable=False, comment="品种代码（如 nf_SA2701）")
+    code: Mapped[str] = mapped_column(String(32), nullable=False, comment="国内期货合约代码（如 nf_SA2701；历史遗留非 nf_ 代码仅保留展示）")
     direction: Mapped[str] = mapped_column(
         String(8), default="long", server_default="long", nullable=False,
         comment="方向：long=做多 / short=做空",

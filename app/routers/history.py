@@ -689,8 +689,10 @@ def history_dailybars(symbol: str = '', limit: int = 0,
 # =====================================================================
 def validate_position_code(code: str, db: Session) -> tuple[bool, str | None]:
     """校验持仓 code 是否合法。返回 (ok, 错误信息)。
-    - nf_ 前缀 → 必须在表内且 is_active，否则拒绝
-    - 其他前缀（hf_/sh/sz/bj/hk）→ 放行（不在本表校验范围）
+
+    持仓只考虑国内期货：code 必须以 `nf_` 开头且命中 futures_base 表内
+    的在交易真实合约（如 nf_RB2701），否则一律拒绝。海外期货(hf_)、
+    港股(hk)、A股证券(sh/sz/bj) 不在持仓范围；纯字母品种名也拒绝。
     """
     c = (code or '').strip()
     if c.startswith('nf_'):
@@ -700,12 +702,16 @@ def validate_position_code(code: str, db: Session) -> tuple[bool, str | None]:
         if fb is None:
             return False, f'合约 {c} 不在可交易清单中（可能已到期下架或不存在）'
         return True, None
-    # 纯字母（1~4 位）：可能是国内品种名（如 RB），缺月份，无法精确对应合约，
-    # 直接拒绝，避免被前端归一化成海外期货而误放行。
+    # 纯字母（1~4 位）：可能是国内品种名（如 RB），缺月份，无法精确对应合约
     if re.fullmatch(r'[A-Za-z]{1,4}', c):
-        return False, f'「{c}」只是品种名，请填写完整合约代码（如 RB2701）或从联想列表选择'
-    # 其他前缀（hf_/sh/sz/bj/hk/6位数字）→ 放行（不在本表校验范围）
-    return True, None
+        return False, f'「{c}」只是品种名，请填写完整国内期货合约代码（如 RB2701）或从联想列表选择'
+    if c.startswith('hf_'):
+        return False, '海外期货已下线：持仓/结算仅支持国内期货（如 nf_RB2701）'
+    if c.lower().startswith('hk'):
+        return False, '港股已下线：持仓/结算仅支持国内期货（如 nf_RB2701）'
+    if re.match(r'^(sh|sz|bj)\d{6}$', c.lower()):
+        return False, '股票/指数不支持记持仓：持仓/结算仅支持国内期货（如 nf_RB2701）'
+    return False, f'「{c}」不是有效的国内期货合约代码（应为 nf_ 开头，如 nf_RB2701）'
 
 
 def auto_fill_multiplier(code: str, db: Session) -> float | None:
@@ -787,7 +793,7 @@ def get_futures_base(code: str, db: Session = Depends(get_db)):
 @router.post("/api/futures-base/validate")
 def validate_codes(payload: dict, db: Session = Depends(get_db)):
     """批量校验 code 列表。前端新增持仓前可一次性校验。
-    body: {"codes": ["nf_RB2701", "nf_XX9999", "hf_OIL"]}
+    body: {"codes": ["nf_RB2701", "nf_XX9999", "sh600519"]}
     返回: {"results": [{"code":..., "ok":true|false, "reason":...}, ...]}
     """
     codes = payload.get("codes") or []

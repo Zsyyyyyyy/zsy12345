@@ -3,6 +3,9 @@
 """
 结算接口 —— 行情看板「我的持仓」平仓结算，成交快照与盈亏写入结算表，按用户隔离。
 
+结算只针对国内期货（nf_ 开头）持仓：历史遗留的海外期货/港股/股票持仓为
+只读记录，不可结算，需先删除。结算币种固定人民币 CNY。
+
 接口（均需登录，Header 带 Authorization: Bearer <token>）：
   POST /api/positions/{pos_id}/settle   结算某条持仓（传结算价 + 可选手数）
                                        不传手数 = 按持仓剩余手数全部平仓；传手数 = 部分结算
@@ -21,14 +24,6 @@ from app.schemas import SettlementCreate, SettlementOut
 router = APIRouter(tags=["settlements"])
 
 
-def _infer_currency(code: str) -> str:
-    """按代码前缀推断币种；海外期货默认美元，恒指为港币，其余人民币。"""
-    c = str(code or "")
-    if c.startswith("hf_"):
-        return "HKD" if c.upper() == "HF_HSI" else "USD"
-    return "CNY"
-
-
 @router.post("/api/positions/{pos_id}/settle", response_model=SettlementOut, status_code=status.HTTP_201_CREATED)
 def settle_position(
     pos_id: int,
@@ -36,13 +31,20 @@ def settle_position(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """结算持仓：按结算价计算盈亏并落表。
+    """结算持仓：按结算价计算盈亏并落表（仅支持国内期货持仓）。
     - 不传 `lots`：按持仓全部手数平仓，写完结算后删除该持仓。
     - 传 `lots`：部分结算（0 < lots < pos.lots），剩余手数扣减留在持仓表；满额时等同全平。
     """
     pos = db.scalar(select(Position).where(Position.id == pos_id, Position.user_id == user.id))
     if pos is None:
         raise HTTPException(status_code=404, detail="持仓不存在")
+
+    # 历史遗留的非国内期货持仓只读：不可结算（可删除）
+    if not pos.code.startswith('nf_'):
+        raise HTTPException(
+            status_code=400,
+            detail='该持仓为历史遗留的非国内期货记录，仅支持查看和删除，不能结算',
+        )
 
     # 手数：请求显式传入 > 持仓全部手数（缺省视为全平）
     settle_lots = float(data.lots) if data.lots is not None else float(pos.lots)
@@ -59,7 +61,8 @@ def settle_position(
     if direction not in ("long", "short"):
         direction = "long"
 
-    currency = data.currency or _infer_currency(pos.code)
+    # 国内期货结算币种固定人民币（历史旧表里的 USD/HKD 记录仅展示保留）
+    currency = "CNY"
     # 做多低买高卖、做空高卖低买，方向决定价差正负的取法
     price_diff = (data.settle_price - pos.buy_price) if direction == "long" else (pos.buy_price - data.settle_price)
     pnl = price_diff * settle_lots * float(multiplier)

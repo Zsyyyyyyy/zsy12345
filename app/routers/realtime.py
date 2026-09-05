@@ -3,8 +3,11 @@
 """
 realtime.py —— 实时行情接口（从网页抓取，新浪源），全部返回 JSON
 
+范围仅限「A股证券(sh/sz/bj，含沪深指数) + 国内期货(nf_)」，
+海外期货(hf_)、港股(hk) 已下线，报价与联想均不再返回。
+
   GET /api/futures            实时报价（公开）
-  GET /api/futures/suggest    搜索联想（公开）
+  GET /api/futures/suggest    搜索联想（公开，仅 A股 + 国内期货）
   GET /api/futures/minline    当日分时（公开）
   GET /api/futures/dailykline 日K图数据（公开，实时向新浪取）
 
@@ -59,28 +62,6 @@ def _parse_hq_item(code: str, fields: list[str]) -> dict | None:
             'volume': fields[14] if len(fields) > 14 else '',
             'time': fields[1] if len(fields) > 1 else '',
         }
-    if code.startswith('hf_'):
-        # 海外期货：开高低等位置与国内不同，原逻辑保留"价格异常时回退到 fields[2]"
-        price = fields[0]
-        try:
-            if float(price) > float(fields[3]) or float(price) < float(fields[2]):
-                price = fields[2]
-        except (ValueError, IndexError):
-            pass
-        name = (fields[13] if len(fields) > 13 else code) or code
-        name = str(name).rstrip('"')
-        volume = (str(fields[14]).replace('"', '') if len(fields) >= 15 else '0')
-        return {
-            'code': code,
-            'name': name,
-            'open': fields[8] if len(fields) > 8 else '',
-            'high': fields[4] if len(fields) > 4 else '',
-            'low': fields[5] if len(fields) > 5 else '',
-            'price': price,
-            'yestclose': fields[7] if len(fields) > 7 else '',
-            'volume': volume,
-            'time': fields[6] if len(fields) > 6 else '',
-        }
     if re.match(r'^(sh|sz|bj)\d', code):
         # A 股/指数：名称,今开,昨收,现价,最高,最低,买一,卖一,成交量,成交额,...,日期,时间
         return {
@@ -94,21 +75,7 @@ def _parse_hq_item(code: str, fields: list[str]) -> dict | None:
             'volume': fields[8] if len(fields) > 8 else '',
             'time': fields[31] if len(fields) > 31 else '',
         }
-    if code.startswith('rt_hk') or code.startswith('hk'):
-        # 港股：英文名,中文名,今开,昨收,最高,最低,现价,涨跌额,涨跌幅,...,成交量,成交额,...,日期,时间
-        # 服务器已对港股加 rt_ 前缀取实时数据，此处归一化回 hkXXX 与看盘代码对齐
-        hk_code = re.sub(r'^rt_', '', code)
-        return {
-            'code': hk_code,
-            'name': fields[1] if len(fields) > 1 else '',
-            'open': fields[2] if len(fields) > 2 else '',
-            'yestclose': fields[3] if len(fields) > 3 else '',
-            'high': fields[4] if len(fields) > 4 else '',
-            'low': fields[5] if len(fields) > 5 else '',
-            'price': fields[6] if len(fields) > 6 else '',
-            'volume': fields[11] if len(fields) > 11 else '',
-            'time': fields[18] if len(fields) > 18 else '',
-        }
+    # 海外期货(hf_)/港股(hk/rt_hk)已下线：不在此解析，返回 None 即被跳过
     return None
 
 
@@ -128,7 +95,12 @@ def _parse_hq_text(text: str) -> list[dict]:
 
 
 def _parse_suggest_text(text: str) -> list[dict]:
-    """解析 suggest3.sinajs.cn 返回的 `var suggest_value="..."` 文本。"""
+    """解析 suggest3.sinajs.cn 返回的 `var suggest_value="..."` 文本。
+
+    包装层：只保留 A股证券（市场 11，代码自带 sh/sz/bj 前缀）与
+    国内期货（市场 85/88 → nf_）；海外期货/现货（市场 86）、基金、
+    债券等其他市场一律丢弃。
+    """
     s = str(text or '')
     start = s.find('="') + 2
     end = s.rfind('"')
@@ -141,26 +113,38 @@ def _parse_suggest_text(text: str) -> list[dict]:
     out: list[dict] = []
     for item in body.split(';'):
         a = item.split(',')
-        if len(a) < 8:
+        if len(a) < 5:
             continue
         market = a[1]
-        code = (a[3] or '').upper()
-        if not code:
+        raw = (a[3] or '').strip()
+        if not raw:
             continue
-        if market == '85' or market == '88':
-            final_code = 'nf_' + code
-        elif market == '86':
-            final_code = 'hf_' + code
+        if market in ('85', '88'):
+            # 国内期货：cu0 -> nf_CU0
+            code = raw.upper()
+            final_code = code if code.startswith('NF_') else 'nf_' + code
+            mk = '期货'
+        elif market == '11':
+            # A股证券/指数：600519(sh600519) / 000300(sh000300)，个别条目带 sh 前缀
+            code = raw.lower()
+            if re.fullmatch(r'(sh|sz|bj)\d{6}', code):
+                final_code = code
+            elif re.fullmatch(r'\d{6}', code):
+                # 兜底：没带交易所前缀时按首位数推断 6/5->沪、0/3->深、其余->北
+                head = code[0]
+                final_code = ('sh' if head in '56' else 'sz' if head in '03' else 'bj') + code
+            else:
+                continue
+            mk = 'A股'
         else:
+            # 海外期货(86)/基金/债券等：全部丢弃
             continue
         if final_code in seen:
             continue
         seen.add(final_code)
-        out.append({
-            'code': final_code,
-            'name': a[0] or a[4],
-            'market': '海外' if market == '86' else '国内',
-        })
+        # a[4] 通常是规范全称（期货 a[0] 同 a[4]；指数条目 a[0] 可能只是代码）
+        name = (a[4] or a[0] or '').strip() or final_code
+        out.append({'code': final_code, 'name': name, 'market': mk})
     return out[:20]
 
 
@@ -172,7 +156,10 @@ def _parse_suggest_text(text: str) -> list[dict]:
 
 @router.get('/api/futures')
 def futures(codes: str = ''):
-    """实时行情：/api/futures?codes=nf_IF0,hf_OIL,sh600519
+    """实时行情：/api/futures?codes=nf_IF0,sh600519,sh000300
+
+    仅支持 A股证券(sh/sz/bj) 与国内期货(nf_)；海外期货(hf_)/港股(hk)
+    不在支持范围，传入也会被跳过、不出现在 items 里。
 
     返回：
       {
@@ -190,9 +177,6 @@ def futures(codes: str = ''):
         s = c.strip()
         if not s:
             continue
-        # 港股（hk 开头）需加 rt_ 前缀才能拿到实时行情，否则约 15 分钟延迟
-        if s.lower().startswith('hk'):
-            s = 'rt_' + s
         items.append(urllib.parse.quote(s))
     text = sina_get('hq.sinajs.cn', '/list=' + ','.join(items))
     if 'FAILED' in text:
@@ -202,13 +186,17 @@ def futures(codes: str = ''):
 
 @router.get('/api/futures/suggest')
 def futures_suggest(key: str = ''):
-    """期货搜索联想：/api/futures/suggest?key=铜
+    """搜索联想（仅 A股 + 国内期货）：/api/futures/suggest?key=黄金
 
-    返回：{"items":[{"code":"nf_RB0","name":"螺纹钢","market":"国内"}, ...]}
+    服务端只请求 11(A股证券)/85/88(国内期货) 三类市场，并把结果再次
+    过滤，保证不会返回海外期货(hf_)/港股(hk) 等代码。
+
+    返回：{"items":[{"code":"sh600519","name":"贵州茅台","market":"A股"},
+                   {"code":"nf_AU0","name":"黄金连续","market":"期货"}, ...]}
     """
     if not key:
         raise HTTPException(status_code=400, detail='缺少 key 参数')
-    path = '/suggest/type=85,86,88&key=' + urllib.parse.quote(key)
+    path = '/suggest/type=11,85,88&key=' + urllib.parse.quote(key)
     text = sina_get('suggest3.sinajs.cn', path)
     return JSONResponse({'items': _parse_suggest_text(text)})
 

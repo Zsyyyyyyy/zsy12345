@@ -248,9 +248,9 @@
   </header>
 
   <div class="add-row" data-page-node-id="6ZaT0yfeiHUyrgtAePTANQ">
-    <input id="searchInput" placeholder="搜索期货：铜 / 黄金 / IF / 螺纹钢…" data-page-node-id="p4qaLxjgACenaNkWn85uXA">
+    <input id="searchInput" placeholder="搜索：期货(铜/黄金/IF) / 股票(茅台/腾讯)…" data-page-node-id="p4qaLxjgACenaNkWn85uXA">
     <button id="addBtn" data-page-node-id="9g7LHC5D8TkN6xcDW3cbfH">添加代码</button>
-    <span class="hint" data-page-node-id="KYiAiTTrBbzN0D7FklaheV">搜索联想选期货；或直接输代码（nf_IF0 / hf_GC / RB0）点添加</span>
+    <span class="hint" data-page-node-id="KYiAiTTrBbzN0D7FklaheV">搜索联想选 A股 / 国内期货；或直接输代码（RB0 / 600519 / nf_IF0）点添加</span>
     <div class="suggest" id="suggestBox" data-page-node-id="pBr2aphNaPgZKGjri6aprV"></div>
   </div>
 
@@ -336,7 +336,6 @@
       <div class="settle-form">
         <label><span>归入分组</span><select id="addGroupSel">
           <option value="国内商品期货">国内商品期货</option>
-          <option value="海外期货">海外期货</option>
           <option value="指数">指数</option>
           <option value="股票">股票</option>
         </select></label>
@@ -369,9 +368,8 @@
 
   const DEFAULT_GROUPS = [
     { name: '股票', codes: ['sh600519', 'sh600036', 'sh601318'] },
-    { name: '指数', codes: ['sh000905', 'sh000688', 'bj899050', 'hkHSTECH', 'sh000001', 'sz399001'] },
+    { name: '指数', codes: ['sh000905', 'sh000688', 'bj899050', 'sh000001', 'sz399001'] },
     { name: '国内商品期货', codes: ['nf_RB0', 'nf_CU0', 'nf_AU0', 'nf_AG0', 'nf_I0', 'nf_M0', 'nf_MA0', 'nf_SC0', 'nf_TA0', 'nf_P0'] },
-    { name: '海外期货', codes: ['hf_OIL', 'hf_CL', 'hf_GC', 'hf_SI', 'hf_NG', 'hf_HG'] },
   ];
 
   const CONFIG_POLL_MS = 3000; // 配置文件轮询间隔（毫秒）
@@ -455,13 +453,12 @@
     const base = configGroups && configGroups.length ? configGroups : DEFAULT_GROUPS;
     return base.filter((g) => g.codes && g.codes.length > 0);
   }
-  // 按品种代码类型归类到对应的看盘分组名
+  // 按品种代码类型归类到对应的看盘分组名（仅剩 A股 + 国内期货）
   function groupNameFor(code) {
     const c = String(code || '');
     if (/^nf_/.test(c)) return '国内商品期货';
-    if (/^hf_/.test(c)) return '海外期货';
-    // 指数：上证 sh000 / 深证 sz399 / 北证 bj899 / 港股字母指数（如 hkHSTECH）
-    if (/^sh000/.test(c) || /^sz399/.test(c) || /^bj899/.test(c) || /^hk[A-Z]+$/.test(c)) return '指数';
+    // A股指数：上证 sh000 / 深证 sz399 / 北证 bj899
+    if (/^sh000/.test(c) || /^sz399/.test(c) || /^bj899/.test(c)) return '指数';
     return '股票';
   }
 
@@ -472,12 +469,9 @@
     let s = String(raw || '').trim().toUpperCase();
     if (!s) return '';
     if (/^NF_/.test(s)) return s.replace(/^NF_/, 'nf_');
-    if (/^HF_/.test(s)) return s.replace(/^HF_/, 'hf_');
     // 股票 / 指数：带 sh/sz/bj 前缀（如 sh600519 / bj899050），必须是 6 位数字。
     // 注意不能只匹配 \d：SH 同时是烧碱期货品种代码，SH2701（4 位）应归期货而非上交所。
     if (/^(SH|SZ|BJ)\d{6}$/.test(s)) return s.toLowerCase();
-    // 港股：hk 前缀（如 hkHSTECH 恒生科技 / hk00700 腾讯）
-    if (/^HK/.test(s)) return 'hk' + s.slice(2);
     // 纯 6 位数字：先判沪市指数（000 开头的指数代码加 sh 前缀），再按首位判断交易所：6→沪、0/3→深、4/8→北
     if (/^\d{6}$/.test(s)) {
       if (SH_INDEX_TAIL.test(s)) return 'sh' + s;
@@ -485,27 +479,20 @@
       if (/^[03]/.test(s)) return 'sz' + s;
       return 'bj' + s;
     }
+    // 国内期货：字母 + 数字（RB0 / RB2701 / IF0），如 RB2701、SH2701
     if (/^[A-Z]+\d/.test(s)) return 'nf_' + s;
-    return 'hf_' + s;
+    // 其余（海外期货字母 OIL/GC、港股 hkXXX 等已下线）→ 无效代码
+    return '';
   }
-  // 持仓专用代码规范化：与 normalizeCode 的唯一区别是——纯字母（品种名，如 RB）不归一化
-  // 成海外期货，而是返回空串，由调用方提示填写完整合约，从而避免「RB 被当成 hf_RB 放行」。
+  // 持仓专用代码规范化：仅接受国内期货（nf_ 前缀或 字母+3~4位数字 的完整合约），
+  // 其余（股票/港股/海外期货/纯字母品种名）一律返回空串，提示重新填写。
   function normalizePosCode(raw) {
     let s = String(raw || '').trim().toUpperCase();
     if (!s) return '';
     if (/^NF_/.test(s)) return s.replace(/^NF_/, 'nf_');
-    if (/^HF_/.test(s)) return s.replace(/^HF_/, 'hf_');
-    if (/^(SH|SZ|BJ)\d{6}$/.test(s)) return s.toLowerCase();
-    if (/^HK/.test(s)) return 'hk' + s.slice(2);
-    if (/^\d{6}$/.test(s)) {
-      if (SH_INDEX_TAIL.test(s)) return 'sh' + s;
-      if (/^[56]/.test(s)) return 'sh' + s;
-      if (/^[03]/.test(s)) return 'sz' + s;
-      return 'bj' + s;
-    }
     // 国内期货完整合约：字母 + 3~4 位数字（RB2701）
     if (/^[A-Z]{1,4}\d{3,4}$/.test(s)) return 'nf_' + s;
-    // 其余（纯字母品种名 RB/OIL 等）→ 返回空，要求明确填写
+    // 纯字母（如 RB）是品种名缺月份；其余是股票/港股/海外期货 → 都无效
     return '';
   }
   // groupName 省略时按代码类型自动归类；返回是否添加成功
@@ -768,7 +755,9 @@
       const lots = Number(p.lots) || 1;
       const mult = multiplierOf(p);
       const dir = dirOf(p);
-      const diff = diffOf(price, buy, dir);
+      // 历史遗留非国内期货（hf_/hk/股票等）：乘数/价差无意义，只读展示不估盈亏
+      const isNf = /^nf_/i.test(p.code);
+      const diff = (!isNf || isNaN(price) || isNaN(buy)) ? NaN : diffOf(price, buy, dir);
       const pnl = isNaN(diff) ? NaN : diff * lots * mult;
       return { id: p.id, code: p.code, name, price, buy, lots, diff, pnl, dir, currency: currencyOf(p.code) };
     });
@@ -794,15 +783,20 @@
       sorted.forEach((r, idx) => {
         const cls = !isNaN(r.pnl) ? (r.pnl > 0 ? 'up' : r.pnl < 0 ? 'down' : 'flat') : 'flat';
         const sign = !isNaN(r.diff) && r.diff > 0 ? '+' : '';
-        html += `<tr data-id="${r.id}"><td class="flat num">${idx + 1}</td><td class="name" title="${r.code}">${r.name}</td>` +
+        // 仅国内期货可编辑/结算/查历史位置；历史遗留（hf_/hk/股票等）只读，保留删除
+        const isNf = /^nf_/i.test(r.code);
+        const opPos = /^nf_[A-Z]+\d{4}$/i.test(r.code) ? '<button class="op pos" title="历史价格位置（历年同月合约）">位</button>' : '';
+        const opEdit = isNf ? '<button class="op edit" title="修改">✎</button>' : '';
+        const opSettle = isNf ? '<button class="op settle" title="结算平仓">≡</button>' : '';
+        const legacyTip = isNf ? '' : '（历史遗留记录：持仓/结算仅支持国内期货，此条可删除）';
+        html += `<tr data-id="${r.id}"><td class="flat num">${idx + 1}</td><td class="name" title="${r.code}${legacyTip}">${r.name}</td>` +
           `<td class="${r.dir === 'short' ? 'down' : 'up'}">${dirLabel(r.dir)}</td>` +
           `<td>${isNaN(r.price) ? '--' : fmtNum(r.price)}</td>` +
           `<td>${fmtNum(r.buy)}</td>` +
           `<td class="${cls}">${isNaN(r.diff) ? '--' : sign + fmtNum(r.diff, 2)}</td>` +
           `<td>${r.lots}</td>` +
           `<td class="${cls}">${isNaN(r.pnl) ? '--' : (r.pnl > 0 ? '+' : '') + fmtNum(r.pnl, 0)} ${currencyLabel(r.currency)}</td>` +
-          `<td>${/^nf_[A-Z]+\d{4}$/i.test(r.code) ? '<button class="op pos" title="历史价格位置（历年同月合约）">位</button>' : ''}` +
-          `<button class="op edit" title="修改">✎</button><button class="op settle" title="结算平仓">≡</button><button class="op del" title="删除">×</button></td></tr>`;
+          `<td>${opPos}${opEdit}${opSettle}<button class="op del" title="删除">×</button></td></tr>`;
       });
     }
     html += '</tbody></table>';
@@ -938,7 +932,7 @@
     const buyRaw = posBuy.value.trim();
     const lotsRaw = posLots.value.trim();
     const multRaw = posMult.value.trim();
-    if (!code) { posMsg.textContent = '请输入完整合约代码（如 RB2701），或从联想列表选择'; return; }
+    if (!code) { posMsg.textContent = '请输入国内期货合约代码（如 RB2701 / nf_RB2701），或从联想列表选择'; return; }
     // 国内期货：提交前先查 futures_base 表，合约存在且 is_active=1 才允许添加
     if (code.startsWith('nf_')) {
       try {
@@ -1499,7 +1493,8 @@
       const ps = await resp.json();
       configPositions = ps.map((p) => ({
         id: p.id,
-        code: normalizeCode(p.code),
+        // 历史遗留的 hf_/hk 等已下线代码保留原样（只读展示，供删除）；其余统一规范化
+        code: normalizeCode(p.code) || String(p.code || '').toLowerCase(),
         direction: p.direction || 'long',
         buyPrice: Number(p.buy_price),
         lots: Number(p.lots) || 1,

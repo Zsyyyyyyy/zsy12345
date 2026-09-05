@@ -3,6 +3,10 @@
 """
 持仓 CRUD 接口 —— 行情看板「我的持仓」数据存 MySQL，按用户隔离。
 
+持仓只考虑国内期货：code 必须以 nf_ 开头且命中 futures_base 的在市合约。
+海外期货/港股/A股 均已下线，不能再新建或修改；历史遗留的非 nf_ 持仓
+保留为只读（可查看、可删除，不能编辑/结算）。
+
 接口（均需登录，Header 带 Authorization: Bearer <token>）：
   GET    /api/positions          读当前用户全部持仓
   POST   /api/positions          新增（同品种可建多条，不校验唯一性）
@@ -42,9 +46,9 @@ def create_position(
 ):
     """新增持仓。允许同一品种建多条（如分批建仓），不校验 code 唯一性。
 
-    校验：若 code 以 `nf_` 开头（国内期货），必须精确命中 futures_base 表内
-    的在交易真实合约（如 nf_RB2701），否则返回 400。海外期货/股票/港股不在此校验范围。
-    自动补乘数：若请求未传，国内期货自动从合约表取 multiplier。
+    持仓只考虑国内期货：code 必须为 nf_ 开头的在市真实合约（如 nf_RB2701），
+    由 validate_position_code 严格校验（海外期货/港股/A股一律拒绝）。
+    自动补乘数：若请求未传，自动从合约表取 multiplier。
     """
     ok, err = validate_position_code(data.code, db)
     if not ok:
@@ -77,6 +81,8 @@ def update_position(
 ):
     """修改持仓。仅更新显式传入的字段；不校验 code 唯一性（允许同品种多条）。
 
+    历史遗留的非国内期货持仓（hf_/hk/sh 等）只读：不允许任何修改，
+    只能查看或删除；需先删除再按国内期货重新添加。
     若传入新 code，按与 create 一致的逻辑校验国内期货合法性。
     """
     pos = db.scalar(select(Position).where(Position.id == pos_id, Position.user_id == user.id))
@@ -84,6 +90,14 @@ def update_position(
         raise HTTPException(status_code=404, detail="持仓不存在")
 
     updates = data.model_dump(exclude_unset=True)
+
+    # 历史遗留非国内期货持仓 = 只读（可删除，不可编辑/结算）
+    if not pos.code.startswith('nf_') and updates:
+        raise HTTPException(
+            status_code=400,
+            detail='该持仓为历史遗留的非国内期货记录，仅支持查看和删除；'
+                   '如需继续跟踪请删除后按国内期货（nf_ 开头）重新添加',
+        )
 
     # code 改了：先校验，校验通过后再写
     if 'code' in updates and updates['code'] != pos.code:

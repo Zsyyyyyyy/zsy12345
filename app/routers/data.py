@@ -853,6 +853,148 @@ def futures_dailykline(symbol: str = ''):
     return JSONResponse({'symbol': symbol, 'data': parse_jsonp(text)})
 
 
+# ---------- 历史价格位置：历年同月合约合并区间（近 7 年，2019+） ----------
+
+# 示例：持仓 nf_RB2701（2027-01 交割），想知现价在历年 1 月合约（RB2001…RB2601）
+# 合并价格区间里的位置。旧年份（<2019）新浪无数据，返回里用 skipped_years 标注。
+_CODE4_RE = re.compile(r'^nf_([A-Za-z]+)(\d{4})$')
+_HIST_SINCE = 2019  # 新浪对具体合约保留约 5~7 年
+
+
+def _parse_contract_code(code: str):
+    """nf_RB2701 -> (underlying='RB', 交割年=2027, 月=1)。非法返回 None。"""
+    raw = (code or '').strip().lower()  # 统一小写以匹配 nf_ 前缀，字母部分随后转大写
+    m = _CODE4_RE.match(raw)
+    if not m:
+        return None
+    underlying = m.group(1).upper()
+    d4 = m.group(2)
+    yy, mm = int(d4[:2]), int(d4[2:])
+    if not 1 <= mm <= 12:
+        return None
+    return underlying, 2000 + yy, mm
+
+
+def _try_sina_daily_rows(canonical_symbol: str, quote_symbol: str) -> list[dict] | None:
+    """用 quote_symbol 问新浪日K，按 canonical_symbol 解析成表行；无数据返回 None。"""
+    text = http_get(KLINE_URL.format(symbol=urllib.parse.quote(quote_symbol)), enc='utf-8')
+    data = parse_jsonp(text)
+    if not isinstance(data, list) or not data:
+        return None
+    rows = _parse_kline_rows(canonical_symbol, data)
+    return rows or None
+
+
+def _daily_rows_of_contract(db: Session, underlying: str, year: int, mm: int):
+    """取某 (品种, 交割年月) 合约的日K行（按日期升序）。库里没有则现抓新浪并入库。"""
+    sym = f'{underlying}{year % 100:02d}{mm:02d}'
+    stmt = (select(FuturesDailyBar)
+            .where(FuturesDailyBar.symbol == sym)
+            .order_by(FuturesDailyBar.trade_date))
+    rows = db.scalars(stmt).all()
+    if rows:
+        return rows
+    # 尝试的查询代码：4 位规范码；郑商所 2021 年前可能只有 3 位老码（如 TA901）
+    attempts = [sym]
+    if year < 2021:
+        attempts.append(f'{underlying}{year % 10}{mm:02d}')
+    for quote in attempts:
+        parsed = _try_sina_daily_rows(sym, quote)
+        if not parsed:
+            continue
+        _upsert_daily_bars(db, parsed, dry_run=False)
+        db.commit()
+        return db.scalars(stmt).all()
+    return []
+
+
+@router.get('/api/futures/hist-position')
+def futures_hist_position(code: str = '', price: float | None = None,
+                          db: Session = Depends(get_db)):
+    """当前价在「历年同月合约」合并历史区间里的位置。
+
+    /api/futures/hist-position?code=nf_RB2701&price=3173
+
+    逻辑：取 2019 年以来每年「同交割月」合约（RB2001…RB2601）的全部日收盘价做池，
+    算 price 落在池中的百分位与区间。数据源：futures_daily_bars 表（没有的合约
+    现抓新浪日K并入库，之后秒回）。更早年（<2019）新浪无数据，会列出 skipped_years。
+
+    返回：
+      {code, underlying, delivery_month, price, price_from,
+       stats:{days,min,max,avg,median,pct,between...},
+       per_year:[{year,symbol,days,min,max}...], skipped_years:[...]}
+    """
+    parsed = _parse_contract_code(code)
+    if parsed is None:
+        raise HTTPException(status_code=400, detail='code 需形如 nf_RB2701（4位年月）')
+    underlying, cur_year, mm = parsed
+    if cur_year > 9999 or cur_year < 2000:
+        raise HTTPException(status_code=400, detail='code 年份不合法')
+
+    # price 缺省时用该合约自身日K最后一根收盘价
+    price_from = 'param'
+    if price is None:
+        own = _daily_rows_of_contract(db, underlying, cur_year, mm)
+        if not own:
+            raise HTTPException(status_code=404,
+                                detail=f'{code} 暂无历史数据（可能新浪未收录）')
+        price = float(own[-1].close)
+        price_from = 'self-last-close'
+
+    per_year = []
+    skipped_years: list[str] = []
+    pool: list[float] = []
+    for y in range(_HIST_SINCE, cur_year):
+        rows = _daily_rows_of_contract(db, underlying, y, mm)
+        if not rows:
+            skipped_years.append(f'{y}年{mm:02d}月（新浪无数据）')
+            continue
+        closes = [float(r.close) for r in rows if r.close is not None]
+        if not closes:
+            skipped_years.append(f'{y}年{mm:02d}月（无有效收盘）')
+            continue
+        pool.extend(closes)
+        per_year.append({
+            'year': y,
+            'symbol': f'{underlying}{y % 100:02d}{mm:02d}',
+            'days': len(closes),
+            'min': min(closes),
+            'max': max(closes),
+            'avg': round(sum(closes) / len(closes), 2),
+        })
+
+    if not pool:
+        return {
+            'ok': False, 'code': code, 'underlying': underlying,
+            'delivery_month': f'{cur_year}-{mm:02d}', 'price': price,
+            'reason': '近 7 年无同月历史合约数据（新浪未收录更早）',
+            'per_year': [], 'skipped_years': skipped_years,
+        }
+
+    pool_sorted = sorted(pool)
+    n = len(pool_sorted)
+    below = sum(1 for v in pool_sorted if v <= price)
+    pct = round(below / n * 100, 1)
+    median = pool_sorted[n // 2] if n % 2 else (pool_sorted[n // 2 - 1] + pool_sorted[n // 2]) / 2
+    # 十分位用于前端画“刻度尺”
+    deciles = [round(pool_sorted[int(n * d / 10) - 1 if d > 0 else 0], 2) for d in range(0, 11)]
+    return {
+        'ok': True,
+        'code': code,
+        'underlying': underlying,
+        'delivery_month': f'{cur_year}-{mm:02d}',
+        'price': price,
+        'price_from': price_from,
+        'stats': {
+            'days': n, 'min': pool_sorted[0], 'max': pool_sorted[-1],
+            'avg': round(sum(pool_sorted) / n, 2), 'median': median,
+            'pct': pct, 'below': below, 'deciles': deciles,
+        },
+        'per_year': per_year,
+        'skipped_years': skipped_years,
+    }
+
+
 # ---------- 触发抓取任务（需登录） ----------
 
 @router.post('/api/futures/refresh-contracts')

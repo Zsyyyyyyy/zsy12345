@@ -809,7 +809,8 @@
           `<td class="${cls}">${isNaN(r.diff) ? '--' : sign + fmtNum(r.diff, 2)}</td>` +
           `<td>${r.lots}</td>` +
           `<td class="${cls}">${isNaN(r.pnl) ? '--' : (r.pnl > 0 ? '+' : '') + fmtNum(r.pnl, 0)} ${currencyLabel(r.currency)}</td>` +
-          `<td><button class="op edit" title="修改">✎</button><button class="op settle" title="结算平仓">≡</button><button class="op del" title="删除">×</button></td></tr>`;
+          `<td>${/^nf_[A-Z]+\d{4}$/i.test(r.code) ? '<button class="op pos" title="历史价格位置（历年同月合约）">位</button>' : ''}` +
+          `<button class="op edit" title="修改">✎</button><button class="op settle" title="结算平仓">≡</button><button class="op del" title="删除">×</button></td></tr>`;
       });
     }
     html += '</tbody></table>';
@@ -836,6 +837,14 @@
     }));
     box.querySelectorAll('.del').forEach((b) => b.addEventListener('click', () => {
       deletePos(Number(b.closest('tr').dataset.id));
+    }));
+    box.querySelectorAll('.pos').forEach((b) => b.addEventListener('click', () => {
+      const id = Number(b.closest('tr').dataset.id);
+      const p = configPositions.find((x) => x.id === id);
+      if (!p) return;
+      const qd = lastDataMap[p.code];
+      const price = qd ? Number(qd.price) : NaN;
+      showHistPos(p.code, price);
     }));
   }
 
@@ -1309,6 +1318,73 @@
     chartSub.textContent = symbol + ' · 最近 ' + n + ' 根日K';
   }
   function closeChart() { chartMask.classList.remove('show'); }
+
+  // ===== 历史价格位置：当前价在历年同月合约合并区间里的位置 =====
+  function hpCss() {
+    if (document.getElementById('hpStyle')) return;
+    const st = document.createElement('style');
+    st.id = 'hpStyle';
+    st.textContent = [
+      '.hp-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;}',
+      '.hp-panel{background:var(--panel,#151515);color:var(--fg,#e6edf3);border:1px solid var(--line,#2a2a2a);border-radius:12px;padding:18px 22px;width:min(600px,92vw);max-height:82vh;overflow:auto;position:relative;font-size:13px;box-shadow:0 8px 40px rgba(0,0,0,.5);}',
+      '.hp-close{position:absolute;right:12px;top:6px;cursor:pointer;font-size:20px;color:var(--muted,#8b949e);line-height:1;}',
+      '.hp-panel h3{margin:0 0 10px;font-size:15px;}',
+      '.hp-sub{color:var(--muted,#8b949e);margin:4px 0 12px;}',
+      '.hp-big{font-size:26px;font-weight:700;margin-bottom:2px;}',
+      '.hp-scale{position:relative;height:10px;border-radius:5px;margin:12px 0 2px;background:linear-gradient(90deg,#2ec27e,#eac54f,#ff5c5c);}',
+      '.hp-marker{position:absolute;top:-4px;width:3px;height:18px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 6px rgba(0,0,0,.8);}',
+      '.hp-axis{display:flex;justify-content:space-between;color:var(--muted,#8b949e);font-size:11px;margin-bottom:8px;}',
+      '.hp-years{margin-top:10px;border-top:1px solid var(--line,#2a2a2a);padding-top:8px;color:var(--muted,#8b949e);line-height:1.9;}',
+      '.hp-years b{color:var(--fg,#e6edf3);}',
+      '.hp-err{color:#ff5c5c;margin-top:8px;}'
+    ].join('\n');
+    document.head.appendChild(st);
+  }
+  function hpEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  async function showHistPos(code, price) {
+    hpCss();
+    const overlay = document.createElement('div');
+    overlay.className = 'hp-ov';
+    const panel = document.createElement('div');
+    panel.className = 'hp-panel';
+    panel.innerHTML = '<span class="hp-close">×</span><h3>历史价格位置</h3><div class="hp-sub">计算中…</div>';
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    panel.querySelector('.hp-close').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    const url = '/api/futures/hist-position?code=' + encodeURIComponent(code) +
+      (Number.isFinite(price) ? '&price=' + encodeURIComponent(String(price)) : '');
+    try {
+      const resp = await fetch(url);
+      const j = await resp.json();
+      const f = (v, d) => { const n = Number(v); return Number.isFinite(n) ? (d === undefined ? fmtNum(n) : fmtNum(n, d)) : '--'; };
+      if (!j.ok) {
+        panel.innerHTML = '<span class="hp-close">×</span><h3>历史价格位置 · ' + hpEsc(j.code || code) + '</h3><div class="hp-err">' + hpEsc(j.reason || '暂无数据') + '</div>';
+        panel.querySelector('.hp-close').addEventListener('click', close);
+        return;
+      }
+      const s = j.stats;
+      const years = (j.per_year || []).map((y) => `<div><b>${hpEsc(y.symbol)}</b>　${y.days}天　${f(y.min)} ~ ${f(y.max)}</div>`).join('');
+      const skip = (j.skipped_years && j.skipped_years.length) ? '<div class="hp-years">未纳入（新浪无更早数据）：' + hpEsc(j.skipped_years.join('、')) + '</div>' : '';
+      const span = (s.max - s.min) > 0 ? Math.max(0, Math.min(100, (j.price - s.min) / (s.max - s.min) * 100)) : 50;
+      panel.innerHTML =
+        '<span class="hp-close">×</span>' +
+        '<h3>历史价格位置 · ' + hpEsc(j.code) + '</h3>' +
+        '<div class="hp-sub">交割月 ' + hpEsc(j.delivery_month) + ' · 现价 <b>' + f(j.price) + '</b> · 对比历年同月合约 <b>' + s.days + '</b> 个交易日</div>' +
+        '<div class="hp-big">' + s.pct + '%</div>' +
+        '<div class="hp-sub">高于同月历史合约 ' + s.pct + '% 的交易日（越接近 100% 越处于历史高位）</div>' +
+        '<div class="hp-scale"><div class="hp-marker" style="left:' + span + '%"></div></div>' +
+        '<div class="hp-axis"><span>' + f(s.min) + '</span><span>中位 ' + f(s.median) + '</span><span>' + f(s.max) + '</span></div>' +
+        '<div class="hp-years">历年同月合约区间：<br>' + years + '</div>' + skip;
+      panel.querySelector('.hp-close').addEventListener('click', close);
+    } catch (e) {
+      panel.innerHTML = '<span class="hp-close">×</span><h3>历史价格位置</h3><div class="hp-err">加载失败：' + hpEsc(String(e)) + '</div>';
+      panel.querySelector('.hp-close').addEventListener('click', close);
+    }
+  }
   chartClose.addEventListener('click', closeChart);
   chartMask.addEventListener('click', (e) => { if (e.target === chartMask) closeChart(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChart(); });

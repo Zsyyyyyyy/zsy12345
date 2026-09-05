@@ -125,7 +125,7 @@
      让「股票/指数/商品期货」各表的表头与数据竖着对齐；
      # 居中；名称(2)/代码(3) 表头与内容一起左对齐；其余数字列右对齐 */
   .quote-table { table-layout: fixed; }
-  .quote-table thead th:nth-child(1) { width: 4%; }
+  .quote-table thead th:nth-child(1) { width: 36px; }
   .quote-table thead th:nth-child(2) { width: 22%; }
   .quote-table thead th:nth-child(3) { width: 15%; }
   .quote-table thead th:last-child { width: 7%; }
@@ -133,6 +133,10 @@
   .quote-table th:nth-child(3), .quote-table td:nth-child(3) { text-align: left; }
   .quote-table th, .quote-table td { overflow: hidden; text-overflow: ellipsis; }
   .quote-table th:last-child, .quote-table td:last-child { overflow: visible; }
+  /* 序号列：固定 36px 足够显示两位序号且不截断 */
+  .quote-table th:nth-child(1), .quote-table td:nth-child(1) { padding-left: 4px; padding-right: 4px; overflow: visible; }
+  /* 名称列表头与内容一起右移一点，和序号列留出间隔 */
+  .quote-table th:nth-child(2), .quote-table td:nth-child(2) { padding-left: 14px; }
   /* 持仓表：名称列(2) 表头跟随内容左对齐 */
   .pos-table th:nth-child(2), .pos-table td:nth-child(2) { text-align: left; }
   .name { color: var(--text); cursor: pointer; text-align: left; }

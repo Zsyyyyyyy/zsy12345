@@ -121,9 +121,18 @@
   th:first-child, td:first-child { text-align: left; }
   td { border-bottom: 1px solid var(--line); }
   tr:hover td { background: var(--line); }
-  /* 看盘行情表列对齐：# 居中；名称(2)/代码(3) 表头与内容一起左对齐；数字列右对齐 */
+  /* 看盘行情表：每个分组表用同一套固定列宽（table-layout:fixed），
+     让「股票/指数/商品期货」各表的表头与数据竖着对齐；
+     # 居中；名称(2)/代码(3) 表头与内容一起左对齐；其余数字列右对齐 */
+  .quote-table { table-layout: fixed; }
+  .quote-table thead th:nth-child(1) { width: 4%; }
+  .quote-table thead th:nth-child(2) { width: 22%; }
+  .quote-table thead th:nth-child(3) { width: 15%; }
+  .quote-table thead th:last-child { width: 7%; }
   .quote-table th:nth-child(2), .quote-table td:nth-child(2),
   .quote-table th:nth-child(3), .quote-table td:nth-child(3) { text-align: left; }
+  .quote-table th, .quote-table td { overflow: hidden; text-overflow: ellipsis; }
+  .quote-table th:last-child, .quote-table td:last-child { overflow: visible; }
   /* 持仓表：名称列(2) 表头跟随内容左对齐 */
   .pos-table th:nth-child(2), .pos-table td:nth-child(2) { text-align: left; }
   .name { color: var(--text); cursor: pointer; text-align: left; }
@@ -548,7 +557,7 @@
       addMsg.textContent = '该品种已在看盘清单中';
       addConfirm.disabled = true;
     }
-    addInfo.innerHTML = '代码：<b>' + code + '</b>' + (fallbackName ? '（' + fallbackName + '）' : '') +
+    addInfo.innerHTML = '代码：<b>' + fmtCode(code) + '</b>' + (fallbackName ? '（' + fallbackName + '）' : '') +
       '<br><span class="loading">获取行情…</span>';
     addMask.classList.add('show');
 
@@ -631,6 +640,10 @@
     if (/^\d{6}$/.test(s)) return s.slice(0, 2) + ':' + s.slice(2, 4) + ':' + s.slice(4, 6);
     return s;
   }
+  // 展示用代码：隐藏 nf_ 前缀（RB2701 / RB0），内部仍用完整代码做行情/增删
+  function fmtCode(code) {
+    return String(code || '').replace(/^nf_/i, '');
+  }
 
   // ===== 持仓标记 =====
   // 找出该代码在「我的」中的持仓（无持仓则 undefined）
@@ -678,7 +691,7 @@
         if (pos) tr.className = 'has-pos';
         if (!d) {
           tr.innerHTML = `<td class="flat num">${idx + 1}</td>` + nameCell(d, code, pos) +
-            `<td class="code">${code}</td><td colspan="4" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
+            `<td class="code">${fmtCode(code)}</td><td colspan="4" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
           tr.querySelector('.del').addEventListener('click', () => removeCode(code));
         } else {
           const price = Number(d.price), yest = Number(d.yestclose);
@@ -692,7 +705,7 @@
           tr.innerHTML =
             `<td class="flat num">${idx + 1}</td>` +
             nameCell(d, code, pos) +
-            `<td class="code">${code}</td>` +
+            `<td class="code">${fmtCode(code)}</td>` +
             `<td class="${cls}">${fmtNum(price)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(updown, 2)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(pct, 2)}%</td>` +
@@ -756,7 +769,7 @@
     const rows = list.map((p) => {
       const d = dataMap[p.code];
       const price = d ? Number(d.price) : NaN;
-      const name = d ? d.name : p.code;
+      const name = d ? d.name : fmtCode(p.code);
       const buy = Number(p.buyPrice);
       const lots = Number(p.lots) || 1;
       const mult = multiplierOf(p);
@@ -886,7 +899,7 @@
   function openPosForm(pos) {
     editingPosId = pos ? pos.id : null;
     posTitle.textContent = pos ? '修改持仓' : '新增持仓';
-    posCode.value = pos ? pos.code : '';
+    posCode.value = pos ? fmtCode(pos.code) : '';
     posDir.value = pos ? dirOf(pos) : 'long';
     syncDirLabel();
     posBuy.value = pos ? pos.buyPrice : '';
@@ -1011,12 +1024,12 @@
     if (!p) return;
     settlingPosId = id;
     const d = lastDataMap[p.code];
-    const name = d ? d.name : p.code;
+    const name = d ? d.name : fmtCode(p.code);
     const curPrice = d ? Number(d.price) : NaN;
     const cur = isNaN(curPrice) ? '--' : fmtNum(curPrice);
     const totalLots = Number(p.lots) || 0;
     settleTitle.textContent = '结算持仓';
-    settleInfo.innerHTML = '品种：<b>' + name + '</b>（' + p.code + '）<br>' +
+    settleInfo.innerHTML = '品种：<b>' + name + '</b>（' + fmtCode(p.code) + '）<br>' +
       '方向：<b>' + dirLabel(dirOf(p)) + '</b> · 开仓价：<b>' + fmtNum(Number(p.buyPrice)) + '</b> · 持仓手数：<b>' + totalLots + '</b> · 现价：<b>' + cur + '</b>';
     settlePrice.value = isNaN(curPrice) ? '' : curPrice;
     settleLots.value = totalLots;  // 默认按全部手数结算
@@ -1409,7 +1422,7 @@
       const div = document.createElement('div');
       div.className = 'item';
       div.innerHTML =
-        `<span class="nm">${it.name}</span><span class="cd">${it.code}</span><span class="mk">${it.market}</span>`;
+        `<span class="nm">${it.name}</span><span class="cd">${fmtCode(it.code)}</span><span class="mk">${it.market}</span>`;
       div.addEventListener('click', () => {
         hideSuggest();
         searchInput.value = '';

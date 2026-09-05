@@ -3,19 +3,24 @@
 """
 data.py —— 全站「抓取数据」统一入口（所有对外输出均为 JSON）
 
-把原本散在三处的抓新浪数据代码收进这一个文件：
-  1) app/routers/futures.py        —— 行情代理 4 个 HTTP 接口（实时/联想/分时/日K）
-  2) refresh_tradable_futures.py   —— 合约清单刷新（原命令行脚本，抓取逻辑迁入）
-  3) fetch_daily_history.py        —— 日级历史行情入库（原命令行脚本，抓取逻辑迁入）
+把原本散在多处的抓新浪数据代码收进这一个文件：
+  1) 行情代理 4 个 HTTP 接口（实时/联想/分时/日K）——原 app/routers/futures.py
+  2) futures_base 合约库刷新（refresh_tradable_futures.py 薄壳脚本的逻辑）
+  3) 日级历史行情入库（fetch_daily_history.py 薄壳脚本的逻辑）
 
 对外接口一览（全部返回 JSON）：
   GET  /api/futures?codes=...                       实时行情（公开）
   GET  /api/futures/suggest?key=...                 搜索联想（公开）
   GET  /api/futures/minline?symbol=...              国内期货分时（公开）
   GET  /api/futures/dailykline?symbol=...           国内期货日K（公开）
-  POST /api/futures/refresh-contracts               刷新可交易合约清单（需登录，后台任务）
+  POST /api/futures/refresh-contracts               刷新 futures_base 在市合约（需登录，后台任务）
   POST /api/futures/fetch-history                   抓取日级历史行情入库（需登录，后台任务）
   GET  /api/futures/jobs/{job_id}                   查询后台任务进度/结果（需登录）
+
+refresh-contracts 只做两件事：① 新浪当前挂牌中表里没有的新合约补进去；
+② 本次成功抓取到的交易所里、没再出现的在市合约置 is_active=0（到期下架）。
+已退市历史合约（更早年份）不进 refresh 维护，由 build_futures_base_history.py
+手动探测补录。
 
 抓新浪日K历史全量约 10 分钟，POST 只负责「开任务」立即返回 job_id；
 进度与结果通过 GET /api/futures/jobs/{job_id} 轮询（内存态，服务重启即丢失）。
@@ -42,7 +47,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal, get_db
 from app.core.security import get_current_user
-from app.models import FuturesDailyBar, TradableFuture, User
+from app.models import FuturesBase, FuturesDailyBar, User
 
 router = APIRouter(tags=["futures-data"])
 
@@ -256,7 +261,7 @@ def _parse_suggest_text(text: str) -> list[dict]:
 
 
 # =====================================================================
-# 三、可交易合约清单刷新（原 refresh_tradable_futures.py 的逻辑）
+# 三、futures_base 合约库刷新（原 refresh_tradable_futures.py 的逻辑）
 # =====================================================================
 
 # 交易所分组 -> 统一代码
@@ -411,10 +416,10 @@ def _upsert_contract(db: Session, code: str, symbol: str, name: str, underlying:
                      underlying_name: str, exchange: str, multiplier: float | None,
                      tick_size: float | None, dry_run: bool) -> str:
     """插入或更新一个合约。返回 inserted/updated/unchanged。"""
-    existing = db.scalar(select(TradableFuture).where(TradableFuture.code == code))
+    existing = db.scalar(select(FuturesBase).where(FuturesBase.code == code))
     if existing is None:
         if not dry_run:
-            db.add(TradableFuture(
+            db.add(FuturesBase(
                 code=code, symbol=symbol, name=name, underlying=underlying,
                 underlying_name=underlying_name, exchange=exchange,
                 multiplier=multiplier, tick_size=tick_size, is_active=True,
@@ -435,7 +440,13 @@ def _upsert_contract(db: Session, code: str, symbol: str, name: str, underlying:
 
 
 def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
-    """刷新 tradable_futures 表（新浪当前挂牌全部真实合约，幂等 upsert）。
+    """刷新 futures_base 在市合约（新浪当前挂牌，幂等 upsert）。
+
+    只做两件事：
+      ① 把当前挂牌、表里还没有的新合约补进去（is_active=1）；
+      ② 把「本次成功抓取到的交易所」里没再出现的在市合约置 is_active=0
+         （到期下架）。某个交易所本次拉取失败时不下架其合约，避免误杀。
+    已退市的历史合约（更早年份）不在此维护，由 build_futures_base_history.py 补录。
 
     log 为可调用对象（接收一行文本）或 None（静默，供 --json / 后台任务用）。
     返回统计 dict（可直接 JSON 序列化）。
@@ -447,6 +458,7 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
     nodes = fetch_nodes()
     say(f'品种 node 数：{len(nodes)}')
     seen_codes: set[str] = set()
+    scanned_exchanges: set[str] = set()
     inserted = updated = unchanged = skipped = failed = 0
 
     for cn_name, node, exchange in nodes:
@@ -456,6 +468,7 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
             say(f'  ✗ {cn_name:8} node={node:12} 拉取失败：{e}')
             failed += 1
             continue
+        scanned_exchanges.add(exchange)
 
         for c in contracts:
             symbol = (c.get('symbol') or '').upper()
@@ -483,18 +496,19 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
                 unchanged += 1
         time.sleep(SLEEP)
 
-    # 把本次没再出现的旧合约标记 is_active=False（合约到期下架）
+    # 把「本次成功抓取到的交易所」里没再出现的在市合约置 is_active=0（到期下架）
     deactivated = 0
     active: int | None = None
     if not dry_run:
-        all_rows = db.scalars(select(TradableFuture)).all()
+        all_rows = db.scalars(select(FuturesBase)).all()
         for row in all_rows:
-            if row.is_active and row.code not in seen_codes:
+            if (row.is_active and row.code not in seen_codes
+                    and row.exchange in scanned_exchanges):
                 row.is_active = False
                 deactivated += 1
         db.commit()
         active = len(db.scalars(
-            select(TradableFuture).where(TradableFuture.is_active.is_(True))
+            select(FuturesBase).where(FuturesBase.is_active.is_(True))
         ).all())
 
     say('-' * 60)
@@ -633,7 +647,7 @@ def run_fetch_history(db: Session, symbols: list[str] | None = None, active_only
                       dry_run: bool = False, log=None) -> dict:
     """抓取国内期货具体合约日级历史行情入库（幂等、可增量）。
 
-    symbols 为 None 时默认取 tradable_futures 表全部具体合约（含已下架）。
+    symbols 为 None 时默认取 futures_base 表全部具体合约（含已下架）。
     log 为可调用对象或 None（静默，供 --json / 后台任务用）。返回统计 dict。
     """
     def say(msg: str) -> None:
@@ -642,16 +656,16 @@ def run_fetch_history(db: Session, symbols: list[str] | None = None, active_only
 
     # ---- 组装 symbol 清单 ----
     if symbols is None:
-        q = (select(TradableFuture.symbol, TradableFuture.name, TradableFuture.exchange)
-             .order_by(TradableFuture.symbol))
+        q = (select(FuturesBase.symbol, FuturesBase.name, FuturesBase.exchange)
+             .order_by(FuturesBase.symbol))
         if active_only:
-            q = q.where(TradableFuture.is_active.is_(True))
+            q = q.where(FuturesBase.is_active.is_(True))
         contract_rows = db.execute(q).all()
         if not contract_rows:
-            msg = ('⚠ tradable_futures 表为空，请先运行：'
+            msg = ('⚠ futures_base 表为空，请先运行：'
                    'venv/bin/python refresh_tradable_futures.py')
             say(msg)
-            return {'ok': False, 'reason': 'tradable_futures 表为空，请先刷新合约清单', 'written': 0}
+            return {'ok': False, 'reason': 'futures_base 表为空，请先刷新合约清单', 'written': 0}
         if limit:
             contract_rows = contract_rows[:limit]
         symbols = [r.symbol for r in contract_rows]
@@ -843,7 +857,10 @@ def futures_dailykline(symbol: str = ''):
 
 @router.post('/api/futures/refresh-contracts')
 def api_refresh_contracts(payload: dict | None = None, user: User = Depends(get_current_user)):
-    """刷新可交易合约清单（新浪当前挂牌真实合约，幂等）。
+    """刷新期货合约库在市合约（新浪当前挂牌，幂等）。
+
+    只添加新挂牌合约 + 把本次成功抓取交易所里没再出现的在市合约置 is_active=0；
+    历史退市合约由 build_futures_base_history.py 另行补录。
 
     body 可选：{"dry_run": false}（true 只试跑不写库）。
     立即返回：{"ok": true, "job_id": "..."}，用 GET /api/futures/jobs/{job_id} 查进度。
@@ -858,7 +875,7 @@ def api_fetch_history(payload: dict | None = None, user: User = Depends(get_curr
     """抓取国内期货日级历史行情入库（幂等、可增量，全量约 10 分钟）。
 
     body 全部可选：
-      {"symbols": "RB2701,RB0" | ["RB2701","RB0"],   # 缺省=tradable_futures 全部具体合约
+      {"symbols": "RB2701,RB0" | ["RB2701","RB0"],   # 缺省=futures_base 全部具体合约
        "active_only": true,     # 只抓在市合约（缺省清单模式默认 true）
        "limit": 0,              # 只处理前 N 个合约（试跑用）
        "full_refresh": false,   # 忽略增量起点全量 upsert

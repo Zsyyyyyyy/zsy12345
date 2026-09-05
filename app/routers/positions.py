@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import Position, User
-from app.routers.tradable_futures import validate_position_code, auto_fill_multiplier
+from app.routers.futures_base import validate_position_code, auto_fill_multiplier
 from app.schemas import PositionCreate, PositionUpdate, PositionOut
 
 router = APIRouter(tags=["positions"])
@@ -42,7 +42,7 @@ def create_position(
 ):
     """新增持仓。允许同一品种建多条（如分批建仓），不校验 code 唯一性。
 
-    校验：若 code 以 `nf_` 开头（国内期货），必须精确命中 tradable_futures 表内
+    校验：若 code 以 `nf_` 开头（国内期货），必须精确命中 futures_base 表内
     的在交易真实合约（如 nf_RB2701），否则返回 400。海外期货/股票/港股不在此校验范围。
     自动补乘数：若请求未传，国内期货自动从合约表取 multiplier。
     """

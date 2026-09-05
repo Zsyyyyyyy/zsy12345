@@ -18,12 +18,19 @@ class User(Base):
     )
 
 
-class TradableFuture(Base):
-    """国内可交易期货「真实合约」字典（全局共享，按完整合约主键）。
+class FuturesBase(Base):
+    """国内期货「合约库」：当前挂牌真实合约 + 已退市历史合约（全局共享，按完整合约主键）。
 
-    不再存品种 underlying（如 RB），而是存当前挂牌的真实合约（如 nf_RB2701），
-    由 refresh_tradable_futures.py 每天从新浪拉取一次刷新。持仓接口据此校验：
-    code 以 nf_ 开头时必须精确命中表内 is_active 合约；海外期货/股票/港股不走此校验。
+    表内同时存两类：
+    - is_active=1：当前挂牌可交易的真实合约（如 nf_RB2701），
+      由每日刷新接口（app/routers/data.py refresh_contracts / refresh_tradable_futures.py）
+      负责「新增挂牌合约 + 把本次没再出现、不能交易的合约置 is_active=0」。
+    - is_active=0：已退市合约（含 build_futures_base_history.py 从新浪逐月探测
+      补进来的近约 5~7 年历史合约），保留用于历史持仓校验与历史行情对照。
+
+    持仓接口据此校验：code 以 nf_ 开头时必须命中 is_active 合约；
+    海外期货/股票/港股不走此校验。fetch_daily_history.py 默认抓取本表全部具体合约
+    （含已下架）的日级历史行情。
 
     字段说明：
     - code：带前缀完整合约代码（如 nf_RB2701），与 positions.code 一致，作主键
@@ -31,7 +38,7 @@ class TradableFuture(Base):
     - underlying / underlying_name：品种代码（RB）/ 品种中文名（螺纹钢），用于分组
     - multiplier / tick_size：品种级属性（每点价值/最小变动），刷新时按品种字典填充
     """
-    __tablename__ = "tradable_futures"
+    __tablename__ = "futures_base"
 
     code: Mapped[str] = mapped_column(String(20), primary_key=True, comment="完整合约代码（如 nf_RB2701）")
     symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="不带前缀合约代码（如 RB2701）")

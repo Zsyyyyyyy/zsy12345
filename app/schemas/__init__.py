@@ -11,7 +11,7 @@ from app.schemas.schemas import (
     WatchGroupCreate,
     WatchGroupUpdate,
     WatchGroupOut,
-    TradableFutureOut,
+    FuturesBaseOut,
 )
 
 __all__ = [
@@ -19,5 +19,5 @@ __all__ = [
     "PositionCreate", "PositionUpdate", "PositionOut",
     "SettlementCreate", "SettlementOut",
     "WatchGroupCreate", "WatchGroupUpdate", "WatchGroupOut",
-    "TradableFutureOut",
+    "FuturesBaseOut",
 ]

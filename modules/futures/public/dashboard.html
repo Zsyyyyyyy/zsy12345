@@ -855,7 +855,7 @@
     if (!kw) { hidePosSuggest(); return; }
     posSuggestTimer = setTimeout(async () => {
       try {
-        const resp = await fetch('/api/tradable-futures/search?key=' + encodeURIComponent(kw));
+        const resp = await fetch('/api/futures-base/search?key=' + encodeURIComponent(kw));
         const list = await resp.json();
         renderPosSuggest(list || []);
       } catch (e) { hidePosSuggest(); }
@@ -935,10 +935,10 @@
     const lotsRaw = posLots.value.trim();
     const multRaw = posMult.value.trim();
     if (!code) { posMsg.textContent = '请输入完整合约代码（如 RB2701），或从联想列表选择'; return; }
-    // 国内期货：提交前先查 tradable_futures 表，合约存在且 is_active=1 才允许添加
+    // 国内期货：提交前先查 futures_base 表，合约存在且 is_active=1 才允许添加
     if (code.startsWith('nf_')) {
       try {
-        const vr = await fetch('/api/tradable-futures/validate', {
+        const vr = await fetch('/api/futures-base/validate', {
           method: 'POST',
           headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ codes: [code] }),

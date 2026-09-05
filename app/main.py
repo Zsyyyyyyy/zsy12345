@@ -9,7 +9,7 @@ from app.routers.auth import router as auth_router
 from app.routers.data import router as data_router
 from app.routers.positions import router as positions_router
 from app.routers.settlements import router as settlements_router
-from app.routers.tradable_futures import router as tradable_futures_router
+from app.routers.futures_base import router as futures_base_router
 from app.routers.watchlist import router as watchlist_router
 
 # 启动时自动建表（已手动建过则无副作用；生产环境建议换 Alembic 迁移）
@@ -56,8 +56,8 @@ app.include_router(data_router)
 # 持仓 CRUD 接口：/api/positions
 app.include_router(positions_router)
 
-# 国内期货品种字典接口：/api/tradable-futures
-app.include_router(tradable_futures_router)
+# 期货合约库接口：/api/futures-base（当前挂牌 + 历史退市；新增持仓校验）
+app.include_router(futures_base_router)
 
 # 结算接口：/api/positions/{id}/settle、/api/settlements
 app.include_router(settlements_router)

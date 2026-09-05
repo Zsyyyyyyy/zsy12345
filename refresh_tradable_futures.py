@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-refresh_tradable_futures.py —— 刷新国内期货「真实合约」字典（薄壳脚本）
+refresh_tradable_futures.py —— 刷新 futures_base 合约库「在市合约」（薄壳脚本，文件名沿用历史命名）
 
 抓取逻辑已收拢到 app/routers/data.py 的 refresh_contracts()（与行情看板共用一份新浪抓取代码）。
 本脚本只负责命令行入口 + 数据库会话 + 输出格式，供 cron 每日调用。
+
+refresh_contracts 语义（只做两件事，不删历史）：
+  ① 新浪当前挂牌、futures_base 里还没有的新合约补进去（is_active=1）；
+  ② 本次成功抓取到的交易所里、没再出现的在市合约置 is_active=0（到期下架）。
+已退市历史合约（更早年份）由 build_futures_base_history.py 手动补录，不进本脚本维护。
 
 用法（在项目根目录）：
     venv/bin/python refresh_tradable_futures.py            # 拉取 + upsert（人类可读输出）

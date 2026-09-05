@@ -32,7 +32,7 @@ from app.routers.data import run_fetch_history
 def main():
     parser = argparse.ArgumentParser(description='抓取国内期货具体合约日级历史行情入库')
     parser.add_argument('--symbols', default='',
-                        help='逗号分隔的 symbol 列表（如 RB2701,RB0），缺省=tradable_futures 全部具体合约')
+                        help='逗号分隔的 symbol 列表（如 RB2701,RB0），缺省=futures_base 全部具体合约')
     parser.add_argument('--active-only', action='store_true',
                         help='只抓 is_active=1 的在市合约（默认含已下架合约，历史更全）')
     parser.add_argument('--limit', type=int, default=0, help='只处理前 N 个合约（试跑用）')

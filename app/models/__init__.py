@@ -1,3 +1,3 @@
-from app.models.models import User, TradableFuture, Position, WatchGroup, Settlement, FuturesDailyBar
+from app.models.models import User, FuturesBase, Position, WatchGroup, Settlement, FuturesDailyBar
 
-__all__ = ["User", "TradableFuture", "Position", "WatchGroup", "Settlement", "FuturesDailyBar"]
+__all__ = ["User", "FuturesBase", "Position", "WatchGroup", "Settlement", "FuturesDailyBar"]

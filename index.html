@@ -254,25 +254,23 @@
 </div>
 
 <script>
-    // 根据本地 token 判断登录态，切换右上角按钮
+    // 登录态存于 HttpOnly Cookie，请求自动携带，前端不碰 token
     async function initNav() {
-        const token = localStorage.getItem('token');
-        if (!token) return; // 未登录，保持默认「注册 / 登录」
         try {
-            const res = await fetch('/me', { headers: { 'Authorization': 'Bearer ' + token } });
-            if (!res.ok) throw new Error();
+            const res = await fetch('/me');
+            if (!res.ok) return; // 未登录 / Cookie 过期，保持默认「注册 / 登录」
             const me = await res.json();
             document.getElementById('nav-username').textContent = me.username;
             document.getElementById('nav-guest').classList.add('hidden');
             document.getElementById('nav-user').classList.remove('hidden');
         } catch (e) {
-            // token 失效则忽略，仍按未登录展示
+            // 网络异常则忽略，仍按未登录展示
         }
     }
 
-    function logout(e) {
+    async function logout(e) {
         e.preventDefault();
-        localStorage.removeItem('token');
+        try { await fetch('/logout', { method: 'POST' }); } catch (err) { /* ignore */ }
         window.location.reload();
     }
 

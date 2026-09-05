@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.database import Base, engine
 from app.routers.auth import router as auth_router
-from app.routers.futures import router as futures_router
+from app.routers.data import router as data_router
 from app.routers.positions import router as positions_router
 from app.routers.settlements import router as settlements_router
 from app.routers.tradable_futures import router as tradable_futures_router
@@ -48,8 +48,10 @@ def futures_page():
 # 认证接口：/register、/login、/me
 app.include_router(auth_router)
 
-# 期货行情代理接口：/api/futures、/api/futures/suggest、/api/futures/minline、/api/futures/dailykline
-app.include_router(futures_router)
+# 数据抓取接口（全部 JSON，收拢在 app/routers/data.py）：
+#   /api/futures、/api/futures/suggest、/api/futures/minline、/api/futures/dailykline
+#   /api/futures/refresh-contracts、/api/futures/fetch-history、/api/futures/jobs/{job_id}
+app.include_router(data_router)
 
 # 持仓 CRUD 接口：/api/positions
 app.include_router(positions_router)

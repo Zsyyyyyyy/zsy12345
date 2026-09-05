@@ -236,7 +236,7 @@
     <span class="title">leek-futures — 行情看板</span>
     <nav class="nav">
       <div class="nav-group" id="nav-guest">
-        <a class="nav-btn solid" href="/login">登录</a>
+        <a class="nav-btn solid" href="/login?next=/futures">登录</a>
       </div>
       <div class="nav-group hidden" id="nav-user">
         <span class="username" id="nav-username"></span>
@@ -930,7 +930,7 @@
     if (t) h['Authorization'] = 'Bearer ' + t;
     return h;
   }
-  function toLogin() { location.replace('/login'); }
+  function toLogin() { location.replace('/login?next=/futures'); }
 
   // ===== 右上角登录态：读 token 调 /me 显示用户名 =====
   async function initNav() {

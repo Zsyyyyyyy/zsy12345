@@ -276,7 +276,10 @@
       try {
         const data = await api('/login', { username, password });
         localStorage.setItem('token', data.access_token);
-        window.location.href = '/';
+        // 登录成功回跳：优先回到 ?next= 指向的页面（如行情面板），否则回首页
+        const next = new URLSearchParams(location.search).get('next');
+        const target = (next && next.startsWith('/') && !next.startsWith('//')) ? next : '/';
+        window.location.href = target;
       } catch (e) {
         flash(e.message, 'error');
       } finally {

@@ -3,9 +3,9 @@
 """
 持仓 CRUD 接口 —— 行情看板「我的持仓」数据存 MySQL，按用户隔离。
 
-持仓只考虑国内期货：code 必须以 nf_ 开头且命中 futures_base 的在市合约。
-海外期货/港股/A股 均已下线，不能再新建或修改；历史遗留的非 nf_ 持仓
-保留为只读（可查看、可删除，不能编辑/结算）。
+持仓只考虑国内期货：code 以 nf_ 开头且「交割月 >= 当前月」即可交易
+（不再查 futures_base / is_active，直接按 symbol 判定，如 2027-02 时 RB2701
+到期不可用、01 合约轮到 RB2801）。历史遗留的非 nf_ 持仓保留为只读。
 
 接口（均需登录，Header 带 Authorization: Bearer <token>）：
   GET    /api/positions          读当前用户全部持仓
@@ -46,9 +46,9 @@ def create_position(
 ):
     """新增持仓。允许同一品种建多条（如分批建仓），不校验 code 唯一性。
 
-    持仓只考虑国内期货：code 必须为 nf_ 开头的在市真实合约（如 nf_RB2701），
-    由 validate_position_code 严格校验（海外期货/港股/A股一律拒绝）。
-    自动补乘数：若请求未传，自动从合约表取 multiplier。
+    持仓只考虑国内期货：code 必须为 nf_ 开头的真实合约格式，且交割月 >= 当前月
+    （由 validate_position_code 按 symbol 日期规则判断，不再查表）。
+    自动补乘数：若请求未传，按品种乘数字典自动取 multiplier。
     """
     ok, err = validate_position_code(data.code, db)
     if not ok:

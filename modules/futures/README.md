@@ -10,23 +10,28 @@
 
 | 接口 | 说明 |
 |---|---|
-| `GET /api/futures?codes=nf_RB2701,hf_OIL,sh600519` | 实时行情 |
-| `GET /api/futures/suggest?key=铜` | 行情搜索联想 |
+| `GET /api/futures?codes=nf_RB2701,sh600519,sh000300` | 实时行情（A股 + 国内期货） |
+| `GET /api/futures/suggest?key=铜` | 行情搜索联想（A股 + 国内期货） |
 | `GET /api/futures/minline?symbol=RB2701` | 国内期货分时 |
 | `GET /api/futures/dailykline?symbol=RB2701` | 国内期货日 K |
 | `GET /api/positions` | 我的持仓 CRUD |
 | `GET /api/positions/{id}/settle` / `GET /api/settlements` | 结算 |
 | `GET /api/groups` | 看盘分组 |
-| `GET /api/tradable-futures` | 可交易合约字典 |
-| `GET /api/tradable-futures/search?key=螺纹钢` | 合约关键字搜索 |
+| `GET /api/futures-base` | 合约库（默认只看可交易） |
+| `GET /api/futures-base/search?key=螺纹钢` | 合约关键字搜索（新增持仓联想） |
+| `GET /api/futures/hist-position` | 历史价格位置 |
+| `GET /api/history/dailybars` | 历史日K（读库） |
 
-## 可交易合约字典
+## 合约库 futures_base
 
-`tradable_futures` 表存的是**真实挂牌合约**（如 `nf_RB2701`），每天 9:00 由定时任务从新浪自动刷新：
+`futures_base` 表存的是**真实挂牌合约**（如 `nf_RB2701`，含到期历史合约），由
+`refresh_tradable_futures.py` 定时从新浪刷新（只增不删、无 is_active）：
 
 ```bash
 venv/bin/python refresh_tradable_futures.py            # 拉取 + upsert
 venv/bin/python refresh_tradable_futures.py --dry-run  # 只看不写
 ```
 
-「新增持仓」的搜索下拉只显示表中 `is_active=True` 的合约。
+「当前可交易」不再靠状态位，统一按 **symbol 交割年月 >= 当前月** 判断：
+「新增持仓」的搜索下拉与提交校验都只认未到期的合约（如 2027-02 时 RB2701 到期，
+01 合约会轮到 RB2801）。

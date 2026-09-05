@@ -933,7 +933,7 @@
     const lotsRaw = posLots.value.trim();
     const multRaw = posMult.value.trim();
     if (!code) { posMsg.textContent = '请输入国内期货合约代码（如 RB2701 / nf_RB2701），或从联想列表选择'; return; }
-    // 国内期货：提交前先查 futures_base 表，合约存在且 is_active=1 才允许添加
+    // 国内期货：提交前调 validate 校验「交割月 >= 当前月」是否可交易（不再查表/is_active）
     if (code.startsWith('nf_')) {
       try {
         const vr = await fetch('/api/futures-base/validate', {

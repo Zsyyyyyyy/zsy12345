@@ -51,9 +51,8 @@ app.include_router(auth_router)
 # ① 实时行情接口（网页抓取新浪）：/api/futures、suggest、minline、dailykline
 app.include_router(realtime_router)
 
-# ② 历史行情 + 品种信息接口（读数据库，数据由定时导入喂）：
-#    /api/futures-base*、/api/futures/hist-position、/api/history/dailybars、
-#    /api/futures/refresh-contracts、/api/futures/fetch-history、/api/futures/jobs/{job_id}
+# ② 历史行情 + 品种信息接口（读数据库，数据由脚本 refresh_tradable_futures.py 定时刷新）：
+#    /api/futures-base*、/api/futures/hist-position、/api/history/dailybars
 app.include_router(history_router)
 
 # 持仓 CRUD 接口：/api/positions

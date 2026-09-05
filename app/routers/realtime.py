@@ -149,10 +149,11 @@ def _parse_suggest_text(text: str) -> list[dict]:
 
 
 # =====================================================================
-# 三、futures_base 合约库刷新（原 refresh_tradable_futures.py 的逻辑）
+# 实时报价 / 联想 / 分时 / 日K（网页抓取新浪）
 # =====================================================================
 
-# 交易所分组 -> 统一代码
+# 注：futures_base 合约库刷新逻辑在 history.py（refresh_contracts，供脚本调用），
+#     实时模块不再维护任何表。
 
 @router.get('/api/futures')
 def futures(codes: str = ''):

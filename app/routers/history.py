@@ -3,39 +3,38 @@
 """
 history.py —— 历史行情 / 品种信息接口（读数据库），全部返回 JSON
 
-品种/合约库（原 futures_base.py 并入）：
-  GET  /api/futures-base                列出合约库（默认在市）
-  GET  /api/futures-base/search         搜索在市合约
-  GET  /api/futures-base/{code}        查单个合约（含历史退市）
-  POST /api/futures-base/validate       批量校验 code
-历史行情与定时导入：
-  GET  /api/futures/hist-position       当前价在历年同月合约区间位置（读库）
+品种/合约库 futures_base（纯只读接口；表数据由 refresh_tradable_futures.py
+脚本定时导入「当前挂牌的新合约」，历史到期合约一直保留、不做下架删除）：
+  GET  /api/futures-base                列出合约库（默认只看「当前可交易」）
+  GET  /api/futures-base/search         搜索可交易合约（持仓代码联想用）
+  GET  /api/futures-base/{code}         查单个合约（含历史到期）
+  POST /api/futures-base/validate       批量校验 code 当前是否可交易
+历史行情：
+  GET  /api/futures/hist-position       当前价在历年同月合约区间位置（读库，缺的现抓回填）
   GET  /api/history/dailybars           从 futures_daily_bars 出历史日K（读库）
-  POST /api/futures/refresh-contracts   定时导入：刷新在市合约（后台任务）
-  POST /api/futures/fetch-history       定时导入：抓日K入库（后台任务）
-  GET  /api/futures/jobs/{job_id}          查询导入任务进度
 
-维护脚本 refresh_tradable_futures.py / fetch_daily_history.py 也调用本文件的
-refresh_contracts / run_fetch_history 完成「定时导入」。
+已删除：is_active 列与 /api/futures/refresh-contracts、/api/futures/fetch-history、
+/api/futures/jobs/{id} 后台任务接口，以及历史导入脚本。
+
+「当前可交易」统一按 symbol 交割年月判断：交割月 >= 当前月 即算可交易
+（如 2027-02 时 RB2701 到期不可用，01 合约自然轮到 RB2801），
+判定逻辑见 _is_live_symbol / validate_position_code。
 """
 import json
 import re
-import threading
 import time
 import urllib.parse
-import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal, get_db
-from app.core.security import get_current_user
+from app.core.database import get_db
 from app.fetchutils import (BATCH_SIZE, CONTRACT_URL, EXCHANGE_MAP, MULTIPLIERS,
                             NODE_LIST_URL, SLEEP, _CONTRACT_RE, http_get, parse_jsonp)
-from app.models import FuturesBase, FuturesDailyBar, User
+from app.models import FuturesBase, FuturesDailyBar
 from app.schemas import FuturesBaseOut
 
 router = APIRouter(tags=["history"])
@@ -78,14 +77,18 @@ def fetch_contracts(node: str) -> list[dict]:
 def _upsert_contract(db: Session, code: str, symbol: str, name: str, underlying: str,
                      underlying_name: str, exchange: str, multiplier: float | None,
                      tick_size: float | None, dry_run: bool) -> str:
-    """插入或更新一个合约。返回 inserted/updated/unchanged。"""
+    """插入或更新一个合约。返回 inserted/updated/unchanged。
+
+    表不再有 is_active：入库过的合约（含已到期）永不删除/改状态，
+    是否「当前可交易」由 symbol 交割年月 vs 当前日期判断（见 _is_live_symbol）。
+    """
     existing = db.scalar(select(FuturesBase).where(FuturesBase.code == code))
     if existing is None:
         if not dry_run:
             db.add(FuturesBase(
                 code=code, symbol=symbol, name=name, underlying=underlying,
                 underlying_name=underlying_name, exchange=exchange,
-                multiplier=multiplier, tick_size=tick_size, is_active=True,
+                multiplier=multiplier, tick_size=tick_size,
             ))
         return 'inserted'
     changed = False
@@ -93,7 +96,6 @@ def _upsert_contract(db: Session, code: str, symbol: str, name: str, underlying:
         ('symbol', symbol), ('name', name), ('underlying', underlying),
         ('underlying_name', underlying_name), ('exchange', exchange),
         ('multiplier', multiplier), ('tick_size', tick_size),
-        ('is_active', True),
     ]:
         if getattr(existing, attr) != val:
             if not dry_run:
@@ -103,15 +105,13 @@ def _upsert_contract(db: Session, code: str, symbol: str, name: str, underlying:
 
 
 def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
-    """刷新 futures_base 在市合约（新浪当前挂牌，幂等 upsert）。
+    """刷新 futures_base 合约库：只加不删（供 refresh_tradable_futures.py 定时调用）。
 
-    只做两件事：
-      ① 把当前挂牌、表里还没有的新合约补进去（is_active=1）；
-      ② 把「本次成功抓取到的交易所」里没再出现的在市合约置 is_active=0
-         （到期下架）。某个交易所本次拉取失败时不下架其合约，避免误杀。
-    已退市的历史合约（更早年份）不在此维护，由 build_futures_base_history.py 补录。
+    新浪当前挂牌、表里还没有的合约补进去（幂等 upsert，同时刷新名称/乘数字段）；
+    已存在的（含到期后不再挂牌的）一律保留、不改状态——是否「当前可交易」由调用方
+    按 symbol 交割年月 vs 当前日期判断，不再维护 is_active，也不做下架扫描。
 
-    log 为可调用对象（接收一行文本）或 None（静默，供 --json / 后台任务用）。
+    log 为可调用对象（接收一行文本）或 None（静默，供 --json 用）。
     返回统计 dict（可直接 JSON 序列化）。
     """
     def say(msg: str) -> None:
@@ -120,8 +120,6 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
 
     nodes = fetch_nodes()
     say(f'品种 node 数：{len(nodes)}')
-    seen_codes: set[str] = set()
-    scanned_exchanges: set[str] = set()
     inserted = updated = unchanged = skipped = failed = 0
 
     for cn_name, node, exchange in nodes:
@@ -131,7 +129,6 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
             say(f'  ✗ {cn_name:8} node={node:12} 拉取失败：{e}')
             failed += 1
             continue
-        scanned_exchanges.add(exchange)
 
         for c in contracts:
             symbol = (c.get('symbol') or '').upper()
@@ -142,7 +139,6 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
                 continue
             underlying = m.group(1)
             code = 'nf_' + symbol
-            seen_codes.add(code)
             name = c.get('name') or ''
             # 新浪把「10 月合约」（如 AU2610）的 name 误标为「连续」，
             # 修正为「品种中文名 + 年月」
@@ -159,33 +155,22 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
                 unchanged += 1
         time.sleep(SLEEP)
 
-    # 把「本次成功抓取到的交易所」里没再出现的在市合约置 is_active=0（到期下架）
-    deactivated = 0
-    active: int | None = None
     if not dry_run:
-        all_rows = db.scalars(select(FuturesBase)).all()
-        for row in all_rows:
-            if (row.is_active and row.code not in seen_codes
-                    and row.exchange in scanned_exchanges):
-                row.is_active = False
-                deactivated += 1
         db.commit()
-        active = len(db.scalars(
-            select(FuturesBase).where(FuturesBase.is_active.is_(True))
-        ).all())
+    total = len(db.scalars(select(FuturesBase)).all())
 
     say('-' * 60)
     say(f'新增 {inserted} / 更新 {updated} / 未变 {unchanged} / '
-        f'跳过(连续等) {skipped} / 拉取失败品种 {failed} / 下架 {deactivated}')
+        f'跳过(连续等) {skipped} / 拉取失败品种 {failed}')
     if not dry_run:
-        say(f'✅ 完成：当前可交易合约 {active} 条')
+        say(f'✅ 完成：合约库共 {total} 条（是否可交易由交割月份判断，本脚本不再维护）')
     else:
         say('[DRY-RUN] 未提交')
     return {
         'dry_run': dry_run, 'nodes': len(nodes),
         'inserted': inserted, 'updated': updated, 'unchanged': unchanged,
-        'skipped': skipped, 'failed': failed, 'deactivated': deactivated,
-        'active': active,
+        'skipped': skipped, 'failed': failed,
+        'total': total,
     }
 
 
@@ -281,163 +266,7 @@ def _upsert_daily_bars(db: Session, rows: list[dict], dry_run: bool) -> int:
     return written
 
 
-def _last_date_of(db: Session, symbol: str) -> date | None:
-    return db.scalar(
-        select(func.max(FuturesDailyBar.trade_date))
-        .where(FuturesDailyBar.symbol == symbol)
-    )
 
-
-def _fetch_symbol(db: Session, symbol: str, dry_run: bool, full_refresh: bool) -> tuple[int, int, str]:
-    """抓一个 symbol 的日K并入库。返回 (新增+更新行数, 总行数, 状态)。"""
-    raw = http_get(KLINE_URL.format(symbol=urllib.parse.quote(symbol)), enc='utf-8')
-    data = parse_jsonp(raw)
-    if not isinstance(data, list):
-        return 0, 0, 'no-data'
-    rows = _parse_kline_rows(symbol, data)
-    if not rows:
-        return 0, 0, 'no-data'
-
-    # 增量：只 upsert 本地最大交易日及之后的行（覆盖当日盘中写入的半根K）
-    if not full_refresh:
-        last = _last_date_of(db, symbol)
-        if last is not None:
-            rows = [r for r in rows if r['trade_date'] >= last]
-    written = _upsert_daily_bars(db, rows, dry_run)
-    return written, len(rows), 'ok'
-
-
-def run_fetch_history(db: Session, symbols: list[str] | None = None, active_only: bool = True,
-                      limit: int = 0, full_refresh: bool = False, sleep_s: float = 0.3,
-                      dry_run: bool = False, log=None) -> dict:
-    """抓取国内期货具体合约日级历史行情入库（幂等、可增量）。
-
-    symbols 为 None 时默认取 futures_base 表全部具体合约（含已下架）。
-    log 为可调用对象或 None（静默，供 --json / 后台任务用）。返回统计 dict。
-    """
-    def say(msg: str) -> None:
-        if log is not None:
-            log(msg)
-
-    # ---- 组装 symbol 清单 ----
-    if symbols is None:
-        q = (select(FuturesBase.symbol, FuturesBase.name, FuturesBase.exchange)
-             .order_by(FuturesBase.symbol))
-        if active_only:
-            q = q.where(FuturesBase.is_active.is_(True))
-        contract_rows = db.execute(q).all()
-        if not contract_rows:
-            msg = ('⚠ futures_base 表为空，请先运行：'
-                   'venv/bin/python refresh_tradable_futures.py')
-            say(msg)
-            return {'ok': False, 'reason': 'futures_base 表为空，请先刷新合约清单', 'written': 0}
-        if limit:
-            contract_rows = contract_rows[:limit]
-        symbols = [r.symbol for r in contract_rows]
-        say(f'合约数：{len(contract_rows)}')
-        for r in contract_rows[:10]:
-            say(f'  {r.symbol:10} {r.name} [{r.exchange}]')
-        if len(contract_rows) > 10:
-            say(f'  ... 等共 {len(contract_rows)} 个')
-
-    total_written = total_rows = ok = no_data = failed = 0
-    t0 = time.time()
-    for i, symbol in enumerate(symbols, 1):
-        try:
-            written, nrows, status = _fetch_symbol(db, symbol, dry_run, full_refresh)
-            total_written += written
-            total_rows += nrows
-            if status == 'ok':
-                ok += 1
-            else:
-                no_data += 1
-            say(f'[{i}/{len(symbols)}] {symbol:10} {status:8} 抓到 {nrows:5} 行，写入 {written:5} 行')
-        except Exception as e:
-            failed += 1
-            say(f'[{i}/{len(symbols)}] {symbol:10} ✗ 失败：{e}')
-        time.sleep(sleep_s)
-
-    say('-' * 60)
-    say(f'✅ 完成：成功 {ok} / 无数据 {no_data} / 失败 {failed}，'
-        f'共写入 {total_written} 行，耗时 {time.time() - t0:.1f}s')
-    if dry_run:
-        say('[DRY-RUN] 未写库')
-    return {
-        'ok': True, 'symbols': len(symbols), 'succeeded': ok, 'no_data': no_data,
-        'failed': failed, 'total_rows': total_rows, 'total_written': total_written,
-        'elapsed_sec': round(time.time() - t0, 1), 'dry_run': dry_run,
-    }
-
-
-# =====================================================================
-# 五、后台任务（耗时抓取通过 POST 开任务立即返回 job_id，进度轮询）
-# =====================================================================
-
-
-JOBS: dict[str, dict] = {}
-_BJ_TZ = timezone(timedelta(hours=8))
-_JOB_LOG_CAP = 300  # 每个任务保留最近多少行日志（防内存膨胀）
-
-
-def _now_bj() -> str:
-    return datetime.now(_BJ_TZ).strftime('%Y-%m-%d %H:%M:%S')
-
-
-def _append_job_log(record: dict, msg: str) -> None:
-    record['lines'].append(msg)
-    if len(record['lines']) > _JOB_LOG_CAP:
-        record['lines'] = record['lines'][-_JOB_LOG_CAP:]
-
-
-def _run_job(job_id: str) -> None:
-    """后台线程：执行任务并回写结果。注意用独立 Session，勿复用请求的 db。"""
-    record = JOBS.get(job_id)
-    db = SessionLocal()
-    try:
-        kind, params = record['kind'], record['params']
-        log = lambda m: _append_job_log(record, m)  # noqa: E731
-        if kind == 'refresh_contracts':
-            result = refresh_contracts(db, dry_run=params.get('dry_run', False), log=log)
-        elif kind == 'fetch_history':
-            result = run_fetch_history(
-                db,
-                symbols=params.get('symbols'),
-                active_only=params.get('active_only', True),
-                limit=params.get('limit', 0),
-                full_refresh=params.get('full_refresh', False),
-                sleep_s=params.get('sleep', SLEEP),
-                dry_run=params.get('dry_run', False),
-                log=log,
-            )
-        else:
-            raise ValueError('未知任务类型: ' + str(kind))
-        record['result'] = result
-        record['status'] = 'done'
-    except Exception as e:
-        record['status'] = 'error'
-        record['error'] = f'{type(e).__name__}: {e}'
-    finally:
-        record['finished_at'] = _now_bj()
-        db.close()
-
-
-def _start_job(kind: str, params: dict) -> str:
-    """登记并启动后台任务，返回 job_id。"""
-    job_id = uuid.uuid4().hex[:12]
-    record = {
-        'job_id': job_id,
-        'kind': kind,
-        'status': 'running',
-        'created_at': _now_bj(),
-        'finished_at': None,
-        'lines': [],
-        'result': None,
-        'error': None,
-        'params': params,
-    }
-    JOBS[job_id] = record
-    threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
-    return job_id
 
 
 # =====================================================================
@@ -589,69 +418,6 @@ def futures_hist_position(code: str = '', price: float | None = None,
     }
 
 
-# ---------- 触发抓取任务（需登录） ----------
-
-
-@router.post('/api/futures/refresh-contracts')
-def api_refresh_contracts(payload: dict | None = None, user: User = Depends(get_current_user)):
-    """刷新期货合约库在市合约（新浪当前挂牌，幂等）。
-
-    只添加新挂牌合约 + 把本次成功抓取交易所里没再出现的在市合约置 is_active=0；
-    历史退市合约由 build_futures_base_history.py 另行补录。
-
-    body 可选：{"dry_run": false}（true 只试跑不写库）。
-    立即返回：{"ok": true, "job_id": "..."}，用 GET /api/futures/jobs/{job_id} 查进度。
-    """
-    dry_run = bool((payload or {}).get('dry_run'))
-    job_id = _start_job('refresh_contracts', {'dry_run': dry_run})
-    return {'ok': True, 'job_id': job_id, 'status': 'running'}
-
-
-@router.post('/api/futures/fetch-history')
-def api_fetch_history(payload: dict | None = None, user: User = Depends(get_current_user)):
-    """抓取国内期货日级历史行情入库（幂等、可增量，全量约 10 分钟）。
-
-    body 全部可选：
-      {"symbols": "RB2701,RB0" | ["RB2701","RB0"],   # 缺省=futures_base 全部具体合约
-       "active_only": true,     # 只抓在市合约（缺省清单模式默认 true）
-       "limit": 0,              # 只处理前 N 个合约（试跑用）
-       "full_refresh": false,   # 忽略增量起点全量 upsert
-       "sleep": 0.3,            # 请求间隔秒数
-       "dry_run": false}
-    立即返回：{"ok": true, "job_id": "..."}，用 GET /api/futures/jobs/{job_id} 查进度。
-    """
-    p = payload or {}
-    symbols = p.get('symbols')
-    if isinstance(symbols, str):
-        symbols = [s.strip().upper() for s in symbols.split(',') if s.strip()]
-    job_id = _start_job('fetch_history', {
-        'symbols': symbols,
-        'active_only': bool(p.get('active_only', True)),
-        'limit': int(p.get('limit', 0) or 0),
-        'full_refresh': bool(p.get('full_refresh', False)),
-        'sleep': float(p.get('sleep', SLEEP) or SLEEP),
-        'dry_run': bool(p.get('dry_run', False)),
-    })
-    return {'ok': True, 'job_id': job_id, 'status': 'running'}
-
-
-
-@router.get('/api/futures/jobs/{job_id}')
-def api_job_status(job_id: str, user: User = Depends(get_current_user)):
-    """查询后台抓取任务状态。
-
-    返回：{"job_id":..., "kind":..., "status": "running|done|error",
-          "created_at":..., "finished_at":..., "lines":[...最近日志], "result":..., "error":...}
-    任务记录在内存中，服务重启后不可查（返回 404）。
-    """
-    record = JOBS.get(job_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail='任务不存在或服务已重启（任务记录在内存）')
-    return {k: record[k] for k in (
-        'job_id', 'kind', 'status', 'created_at', 'finished_at', 'lines', 'result', 'error'
-    )}
-
-
 @router.get('/api/history/dailybars')
 def history_dailybars(symbol: str = '', limit: int = 0,
                       db: Session = Depends(get_db)):
@@ -659,8 +425,8 @@ def history_dailybars(symbol: str = '', limit: int = 0,
 
     /api/history/dailybars?symbol=RB2701&limit=0
 
-    数据由定时导入（fetch_daily_history.py / POST /api/futures/fetch-history）
-    写入。库中暂无该合约时返回 ok=false + reason，前端可回退到实时网页日K。
+    futures_daily_bars 由「历史价格位置」查询按需回填（见 /api/futures/hist-position）；
+    库中暂无该合约时返回 ok=false + reason，前端可回退到实时网页日K。
     返回：{ok, symbol, rows:[{date,open,high,low,close,volume,open_interest,settlement}]}
     """
     sym = (symbol or '').strip().upper()
@@ -674,7 +440,7 @@ def history_dailybars(symbol: str = '', limit: int = 0,
     rows = db.scalars(stmt).all()
     if not rows:
         return {'ok': False, 'symbol': sym,
-                'reason': '库中暂无该合约日K（请先跑 fetch_daily_history.py 定时导入）',
+                'reason': '库中暂无该合约日K（可访问 /api/futures/hist-position 按需回填）',
                 'rows': []}
     return {'ok': True, 'symbol': sym, 'rows': [{
         'date': str(r.trade_date),
@@ -685,22 +451,46 @@ def history_dailybars(symbol: str = '', limit: int = 0,
 
 
 # =====================================================================
-# 品种/合约库（原 futures_base.py 合并而来）
+# 品种/合约库 futures_base（纯只读接口；无 is_active，「可交易」按交割年月判断）
 # =====================================================================
+def _is_live_symbol(symbol: str) -> bool:
+    """交割月 >= 当前月 即视为「当前可交易」（2027-02 时 RB2701 已到期）。
+    非「字母+4位年月」的码（连续 RB0 等）不适用该规则，一律放行。
+    """
+    m = _CONTRACT_RE.match((symbol or '').upper())
+    if not m:
+        return True
+    yy, mm = int(m.group(2)[:2]), int(m.group(2)[2:])
+    if not 1 <= mm <= 12:
+        return True
+    today = date.today()
+    return date(2000 + yy, mm, 1) >= today.replace(day=1)
+
+
 def validate_position_code(code: str, db: Session) -> tuple[bool, str | None]:
     """校验持仓 code 是否合法。返回 (ok, 错误信息)。
 
-    持仓只考虑国内期货：code 必须以 `nf_` 开头且命中 futures_base 表内
-    的在交易真实合约（如 nf_RB2701），否则一律拒绝。海外期货(hf_)、
-    港股(hk)、A股证券(sh/sz/bj) 不在持仓范围；纯字母品种名也拒绝。
+    持仓只考虑国内期货，且按 symbol 判断「当前可交易」——不再依赖 futures_base
+    表与 is_active：
+    - nf_ 开头 + 品种 + 4 位交割年月，交割月 >= 当前月 → 通过；
+      例如 2027-02 时 RB2701（2027-01 交割）已到期不可用，01 合约轮到 RB2801。
+    - 海外期货(hf_)、港股(hk)、A股证券(sh/sz/bj)、纯字母品种名一律拒绝。
+    db 参数保留以兼容旧调用方，本函数不再读表。
     """
     c = (code or '').strip()
     if c.startswith('nf_'):
-        fb = db.scalar(select(FuturesBase).where(
-            FuturesBase.code == c, FuturesBase.is_active.is_(True)
-        ))
-        if fb is None:
-            return False, f'合约 {c} 不在可交易清单中（可能已到期下架或不存在）'
+        sym = c[4:].upper()
+        m = _CONTRACT_RE.match(sym)
+        if not m:
+            return False, f'「{c}」不是有效合约：应形如 nf_RB2701（品种 + 4 位交割年月）'
+        yy, mm = int(m.group(2)[:2]), int(m.group(2)[2:])
+        if not 1 <= mm <= 12:
+            return False, f'「{c}」的月份不合法（应为 01~12，如 nf_RB2701）'
+        today = date.today()
+        if date(2000 + yy, mm, 1) < today.replace(day=1):
+            return False, (f'合约 {c} 已到期（交割月 20{yy:02d}年{mm:02d} 早于当前 '
+                           f'{today.year}年{today.month:02d}月）。可交易判断：交割月 >= 当前月，'
+                           f'如 01 合约在到期后要选下一年的（RB2701 → RB2801），请从联想列表选择')
         return True, None
     # 纯字母（1~4 位）：可能是国内品种名（如 RB），缺月份，无法精确对应合约
     if re.fullmatch(r'[A-Za-z]{1,4}', c):
@@ -715,12 +505,15 @@ def validate_position_code(code: str, db: Session) -> tuple[bool, str | None]:
 
 
 def auto_fill_multiplier(code: str, db: Session) -> float | None:
-    """若持仓未传 multiplier，且 code 是国内期货，则从合约库自动补乘数。"""
+    """持仓未传 multiplier 时，按品种乘数字典自动补（不再查合约库）。"""
     c = (code or '').strip()
     if not c.startswith('nf_'):
         return None
-    fb = db.scalar(select(FuturesBase).where(FuturesBase.code == c))
-    return fb.multiplier if fb else None
+    m = _CONTRACT_RE.match(c[4:].upper())
+    if not m:
+        return None
+    v = MULTIPLIERS.get(m.group(1))
+    return v[0] if v else None
 
 
 # ========== HTTP 端点 ==========
@@ -728,18 +521,19 @@ def auto_fill_multiplier(code: str, db: Session) -> float | None:
 @router.get("/api/futures-base", response_model=list[FuturesBaseOut])
 def list_futures_base(
     underlying: str | None = Query(None, description="按品种代码筛选，如 RB"),
-    active_only: bool = Query(True, description="只列在市合约；false 连历史退市合约一起列"),
+    active_only: bool = Query(True, description="默认只看交割月 >= 当月（当前可交易）；false 连历史到期合约一起列"),
     db: Session = Depends(get_db),
 ):
-    """列出合约库条目（默认只在市）。前端拿下拉框/联想，或按品种筛选。"""
+    """列出合约库条目。默认按交割年月过滤出「当前可交易」合约，前端拿下拉框/联想。"""
     stmt = select(FuturesBase).order_by(
         FuturesBase.exchange, FuturesBase.underlying, FuturesBase.symbol
     )
-    if active_only:
-        stmt = stmt.where(FuturesBase.is_active.is_(True))
     if underlying:
         stmt = stmt.where(FuturesBase.underlying == underlying.upper())
-    return db.scalars(stmt).all()
+    rows = db.scalars(stmt).all()
+    if active_only:
+        rows = [r for r in rows if _is_live_symbol(r.symbol)]
+    return rows
 
 
 @router.get("/api/futures-base/search", response_model=list[FuturesBaseOut])
@@ -748,10 +542,10 @@ def search_futures_base(
     limit: int = Query(30, ge=1, le=100, description="最多返回条数"),
     db: Session = Depends(get_db),
 ):
-    """按关键字搜索在市合约（新增持仓联想）。空关键字返回空列表。
+    """按关键字搜索「当前可交易」合约（新增持仓联想）。空关键字返回空列表。
 
-    匹配优先级：symbol 前缀命中（如 RB -> RB2701...）排最前，其余按
-    交易所/品种/合约排序。
+    只返回交割月 >= 当月的合约：RB2701 到期后不再出现，联想里的 01 合约
+    自然轮到 RB2801。匹配优先级：symbol 前缀命中（如 RB -> RB2701...）排最前。
     """
     kw = (key or '').strip()
     if not kw:
@@ -761,7 +555,6 @@ def search_futures_base(
     prefix_like = f"{kw.upper()}%"
     stmt = (
         select(FuturesBase)
-        .where(FuturesBase.is_active.is_(True))
         .where(or_(
             FuturesBase.symbol.ilike(like),
             FuturesBase.code.ilike(like),
@@ -776,15 +569,16 @@ def search_futures_base(
             FuturesBase.underlying,
             FuturesBase.symbol,
         )
-        .limit(limit)
+        .limit(limit * 4)  # 多取一些，过滤掉已到期合约后仍够 limit
     )
-    return db.scalars(stmt).all()
+    rows = db.scalars(stmt).all()
+    return [r for r in rows if _is_live_symbol(r.symbol)][:limit]
 
 
 @router.get("/api/futures-base/{code}", response_model=FuturesBaseOut)
 def get_futures_base(code: str, db: Session = Depends(get_db)):
-    """查单个合约（传完整 code 如 nf_RB2701；历史退市合约也能查到）。"""
-    fb = db.scalar(select(FuturesBase).where(FuturesBase.code == code.upper()))
+    """查单个合约（传完整 code 如 nf_RB2701；历史到期合约也能查到，不带状态）。"""
+    fb = db.scalar(select(FuturesBase).where(func.lower(FuturesBase.code) == code.lower()))
     if fb is None:
         raise HTTPException(status_code=404, detail="合约不存在")
     return fb
@@ -792,8 +586,8 @@ def get_futures_base(code: str, db: Session = Depends(get_db)):
 
 @router.post("/api/futures-base/validate")
 def validate_codes(payload: dict, db: Session = Depends(get_db)):
-    """批量校验 code 列表。前端新增持仓前可一次性校验。
-    body: {"codes": ["nf_RB2701", "nf_XX9999", "sh600519"]}
+    """批量校验 code 是否「当前可交易」（按交割年月规则，不查库）。前端新增持仓前调用。
+    body: {"codes": ["nf_RB2701", "nf_RB2801", "sh600519"]}
     返回: {"results": [{"code":..., "ok":true|false, "reason":...}, ...]}
     """
     codes = payload.get("codes") or []

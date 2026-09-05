@@ -19,18 +19,16 @@ class User(Base):
 
 
 class FuturesBase(Base):
-    """国内期货「合约库」：当前挂牌真实合约 + 已退市历史合约（全局共享，按完整合约主键）。
+    """国内期货「合约库」：当前挂牌 + 历史到期合约（全局共享，按完整合约主键）。
 
-    表内同时存两类：
-    - is_active=1：当前挂牌可交易的真实合约（如 nf_RB2701），
-      由每日刷新接口（app/routers/data.py refresh_contracts / refresh_tradable_futures.py）
-      负责「新增挂牌合约 + 把本次没再出现、不能交易的合约置 is_active=0」。
-    - is_active=0：已退市合约（含 build_futures_base_history.py 从新浪逐月探测
-      补进来的近约 5~7 年历史合约），保留用于历史持仓校验与历史行情对照。
+    只增不改删：refresh_tradable_futures.py（定时）把新浪当前挂牌的新合约补进来
+    （幂等 upsert）；入库过的合约（含到期后不再挂牌的）永不删除、也没有状态位。
 
-    持仓接口据此校验：code 必须为 nf_ 开头且命中 is_active 合约；
-    海外期货/港股/A股 已下线，不再纳入持仓。fetch_daily_history.py 默认抓取本表全部具体合约
-    （含已下架）的日级历史行情。
+    是否「当前可交易」不再用列维护，由调用方按 symbol 交割年月判断：
+    交割月 >= 当前月 即可交易（如 2027-02 时 RB2701 到期、01 合约轮到 RB2801）。
+    持仓接口据此只做格式+日期校验（见 app/routers/history.py validate_position_code），
+    不再命中本表；本表只服务于持仓代码联想 /api/futures-base/search（过滤已到期）
+    与品种字典展示。海外期货/港股/A股 已下线，不纳入持仓。
 
     字段说明：
     - code：带前缀完整合约代码（如 nf_RB2701），与 positions.code 一致，作主键
@@ -48,7 +46,6 @@ class FuturesBase(Base):
     exchange: Mapped[str] = mapped_column(String(8), nullable=False, comment="交易所 SHFE/DCE/CZCE/CFFEX/GFEX")
     multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="合约乘数（每点价值，元；新品种可能为空）")
     tick_size: Mapped[float | None] = mapped_column(Float, nullable=True, comment="最小变动价位")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True, comment="是否仍在交易（到期/下架合约置 False 保留历史）")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"

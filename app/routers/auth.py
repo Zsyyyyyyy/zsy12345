@@ -1,16 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import (
-    COOKIE_MAX_AGE,
-    COOKIE_NAME,
-    get_current_user,
-    hash_password,
-    verify_password,
-    create_access_token,
-)
+from app.core.security import hash_password, verify_password, create_access_token, get_current_user
 from app.models import User
 from app.schemas import UserRegister, UserLogin, Token, UserOut
 
@@ -36,7 +29,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(data: UserLogin, response: Response, db: Session = Depends(get_db)):
+def login(data: UserLogin, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.username == data.username))
 
     # 用户不存在 / 密码错误统一返回 401，不暴露具体是哪一项
@@ -47,23 +40,7 @@ def login(data: UserLogin, response: Response, db: Session = Depends(get_db)):
         )
 
     token = create_access_token(user.id, user.username)
-    # HttpOnly Cookie：JS 读不到，防 XSS 偷 token；30 天内免登录
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        max_age=COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="lax",
-        path="/",
-    )
     return Token(access_token=token)
-
-
-@router.post("/logout")
-def logout(response: Response):
-    """退出登录：清除 Cookie（前端不需要再删 localStorage）"""
-    response.delete_cookie(key=COOKIE_NAME, path="/")
-    return {"detail": "已退出登录"}
 
 
 @router.get("/me", response_model=UserOut)

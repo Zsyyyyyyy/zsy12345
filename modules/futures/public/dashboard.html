@@ -218,7 +218,7 @@
     <span class="title">leek-futures — 行情看板</span>
     <nav class="nav">
       <div class="nav-group" id="nav-guest">
-        <a class="nav-btn solid" id="loginBtn" href="/login">登录</a>
+        <a class="nav-btn solid" href="/login">登录</a>
       </div>
       <div class="nav-group hidden" id="nav-user">
         <span class="username" id="nav-username"></span>
@@ -596,16 +596,8 @@
     if (ok) closeAddForm();
   }
   async function removeCode(code) {
-    // 未登录时分组来自内置默认清单，无法删除；点删除给出明确提示
-    if (!configGroups) {
-      alert('当前展示的是默认行情（未登录），登录后即可管理自己的自选分组');
-      return;
-    }
-    const g = configGroups.find((x) => (x.codes || []).includes(code));
-    if (!g || !g.id) {
-      alert('未找到「' + code + '」所属的看盘分组，无法删除');
-      return;
-    }
+    const g = configGroups && configGroups.find((x) => (x.codes || []).includes(code));
+    if (!g || !g.id) return;
     const codes = g.codes.filter((c) => c !== code);
     try {
       const resp = await fetch('/api/groups/' + g.id, {
@@ -906,34 +898,37 @@
     posCode.focus();
   }
   function closePosForm() { posMask.classList.remove('show'); }
-  // ===== 登录态：HttpOnly Cookie 自动携带，无需手动拼 Authorization 头；401 跳登录页 =====
+  // ===== 登录态：读 token、拼 Authorization 头、401 跳登录页 =====
+  function getToken() {
+    try { return localStorage.getItem('token') || ''; } catch (e) { return ''; }
+  }
   function authHeaders(extra) {
-    return Object.assign({}, extra || {});
+    const h = Object.assign({}, extra || {});
+    const t = getToken();
+    if (t) h['Authorization'] = 'Bearer ' + t;
+    return h;
   }
-  // 登录链接带上当前页地址，登录成功后跳回看板
-  function bindLogin() {
-    const btn = document.getElementById('loginBtn');
-    if (btn) btn.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
-  }
-  function toLogin() { location.replace('/login?next=' + encodeURIComponent(location.pathname + location.search)); }
+  function toLogin() { location.replace('/login'); }
 
-  // ===== 右上角登录态：调 /me 显示用户名 =====
+  // ===== 右上角登录态：读 token 调 /me 显示用户名 =====
   async function initNav() {
+    const token = getToken();
+    if (!token) return; // 未登录，保持「登录」按钮
     try {
-      const res = await fetch('/me');
-      if (!res.ok) return; // 未登录 / Cookie 过期，保持「登录」按钮
+      const res = await fetch('/me', { headers: { 'Authorization': 'Bearer ' + token } });
+      if (!res.ok) throw new Error();
       const me = await res.json();
       document.getElementById('nav-username').textContent = me.username;
       document.getElementById('nav-guest').classList.add('hidden');
       document.getElementById('nav-user').classList.remove('hidden');
     } catch (e) {
-      // 网络异常则忽略，仍按未登录展示
+      // token 失效则忽略，仍按未登录展示
     }
   }
   function bindLogout() {
-    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    document.getElementById('logoutBtn').addEventListener('click', (e) => {
       e.preventDefault();
-      try { await fetch('/logout', { method: 'POST' }); } catch (err) { /* ignore */ }
+      try { localStorage.removeItem('token'); } catch (err) { /* ignore */ }
       location.reload();
     });
   }
@@ -1479,7 +1474,6 @@
   async function loadConfig(force) {
     try {
       const resp = await fetch('/api/groups?t=' + Date.now(), { headers: authHeaders() });
-      // 未登录 / 登录过期：静默降级用默认分组，看板照常浏览（个人自选在登录后展示）
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const gs = await resp.json();
       const sig = JSON.stringify(gs);
@@ -1520,7 +1514,6 @@
   setupTimer();
   initNav();
   bindLogout();
-  bindLogin();
   loadPositions();
   loadConfig(true);
   setInterval(() => loadConfig(false), CONFIG_POLL_MS);

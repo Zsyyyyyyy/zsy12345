@@ -21,39 +21,17 @@ from app.schemas import WatchGroupCreate, WatchGroupUpdate, WatchGroupOut
 
 router = APIRouter(tags=["watchlist"])
 
-# 首次登录播种用的默认分组（与前端 dashboard.html 的 DEFAULT_GROUPS 保持一致）
-DEFAULT_GROUPS = [
-    {"name": "股票", "codes": ["sh600519", "sh600036", "sh601318"]},
-    {"name": "指数", "codes": ["sh000905", "sh000688", "bj899050", "hkHSTECH", "sh000001", "sz399001"]},
-    {"name": "国内商品期货", "codes": ["nf_RB0", "nf_CU0", "nf_AU0", "nf_AG0", "nf_I0", "nf_M0", "nf_MA0", "nf_SC0", "nf_TA0", "nf_P0"]},
-    {"name": "海外期货", "codes": ["hf_OIL", "hf_CL", "hf_GC", "hf_SI", "hf_NG", "hf_HG"]},
-]
-
 
 @router.get("/api/groups", response_model=list[WatchGroupOut])
 def list_groups(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """读当前用户全部分组，按 sort_order、id 升序。
-
-    首次使用（名下一个分组都没有）时，把默认分组播种到该用户名下，
-    保证登录后看到的默认品种可以直接增删改。
-    """
-    groups = db.scalars(
+    """读当前用户全部分组，按 sort_order、id 升序。"""
+    return db.scalars(
         select(WatchGroup).where(WatchGroup.user_id == user.id)
         .order_by(WatchGroup.sort_order, WatchGroup.id)
     ).all()
-    if not groups:
-        groups = []
-        for i, d in enumerate(DEFAULT_GROUPS):
-            g = WatchGroup(user_id=user.id, name=d["name"], codes=d["codes"], sort_order=i)
-            db.add(g)
-            groups.append(g)
-        db.commit()
-        for g in groups:
-            db.refresh(g)
-    return groups
 
 
 @router.post("/api/groups", response_model=WatchGroupOut, status_code=status.HTTP_201_CREATED)

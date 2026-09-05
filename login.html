@@ -199,7 +199,9 @@
         <div class="kv" data-page-node-id="8RUNpOht5MA6e6x9VFlnim"><b data-page-node-id="G0XdGRQBcY3TZudLpN5S55">邮箱　　</b><span id="me_email" data-page-node-id="CfkTNrWl7vaDy6xnhzHZil"></span></div>
         <div class="kv" data-page-node-id="B4uZYvKSkbxORgBr18Mvxc"><b data-page-node-id="svcEOD2KGLX9YSWkqnNjqI">用户 ID</b><span id="me_id" data-page-node-id="5EQoy8kci2xiJWQmLkM3XK"></span></div>
         <div class="kv" data-page-node-id="hiNOv0NW5S1WTl3qETuCFR"><b data-page-node-id="Bn9m2gyBJnWO3BEAEBGzGX">注册时间</b><span id="me_created" data-page-node-id="AE7V2bppkrf7lzfs9xmwSA"></span></div>
-        <div class="sub" style="margin-top:12px;">30 天内免登录，无需重复输入密码</div>
+        <label style="margin-top:6px;" data-page-node-id="DgSyujZbOldvCcZbSHo6MA">access_token</label>
+        <div class="token-box" id="token_box" data-page-node-id="u6JrDYqekdmLoKgEU2T7zM"></div>
+        <button class="copy" onclick="copyToken()" data-page-node-id="O7zrCLGgR7N7gL1EpC5INM">复制 token</button>
         <button type="button" class="btn" onclick="logout()" style="margin-top:12px;" data-page-node-id="Bhbli5TilDSY4gX1JagdHo">退出登录</button>
       </div>
 
@@ -265,13 +267,6 @@
       return data;
     }
 
-    // 登录成功后的跳转目标：?next= 指定的站内页面，默认回首页
-    function nextUrl() {
-      const next = new URLSearchParams(location.search).get('next') || '/';
-      // 只接受站内相对路径，拒绝 //xxx、http:// 等外部地址（防开放重定向）
-      return next.startsWith('/') && !next.startsWith('//') ? next : '/';
-    }
-
     async function doLogin() {
       flash('', '');
       const username = $('login_username').value.trim();
@@ -279,9 +274,9 @@
       if (!username || !password) { flash('请输入用户名和密码', 'error'); return; }
       setLoading('login_btn', true);
       try {
-        await api('/login', { username, password });
-        // token 已由服务端写入 HttpOnly Cookie，前端无需保存
-        window.location.href = nextUrl();
+        const data = await api('/login', { username, password });
+        localStorage.setItem('token', data.access_token);
+        window.location.href = '/';
       } catch (e) {
         flash(e.message, 'error');
       } finally {
@@ -312,25 +307,31 @@
     }
 
     async function renderMe() {
-      // 登录态存在 HttpOnly Cookie 里，同源请求自动携带，前端读不到也无需读
+      const token = localStorage.getItem('token');
+      if (!token) { show('login-view'); return; }
       try {
-        const res = await fetch(API_BASE + '/me');
+        const res = await fetch(API_BASE + '/me', { headers: { 'Authorization': 'Bearer ' + token } });
         if (!res.ok) throw new Error();
         const user = await res.json();
         $('me_username').textContent = user.username;
         $('me_email').textContent = user.email;
         $('me_id').textContent = '#' + user.id;
         $('me_created').textContent = (user.created_at || '').replace('T', ' ').slice(0, 19);
+        $('token_box').textContent = token;
         show('me-view');
-        return true;
       } catch (e) {
-        show('login-view');
-        return false;
+        logout();
       }
     }
 
-    async function logout() {
-      try { await fetch(API_BASE + '/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+    function copyToken() {
+      navigator.clipboard.writeText(localStorage.getItem('token') || '').then(() => {
+        flash('已复制到剪贴板', 'success');
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
       flash('', '');
       show('login-view');
     }
@@ -338,17 +339,13 @@
     // 登录表单回车提交
     $('login_password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
-    // 页面加载：Cookie 未过期则自动恢复登录态；带 #register 且未登录时展示注册视图
-    (async function init() {
-      const logged = await renderMe();
-      const next = new URLSearchParams(location.search).get('next');
-      // 已登录且指定了回跳地址（如从看板跳来），直接送回去
-      if (logged && next && next.startsWith('/') && !next.startsWith('//')) {
-        window.location.replace(next);
-        return;
-      }
-      if (!logged && location.hash === '#register') show('register-view');
-    })();
+    // 页面加载：已有 token 则自动恢复登录态
+    renderMe();
+
+    // 从首页「注册」按钮跳转 /login#register 时，自动切到注册视图
+    if (location.hash === '#register' && !localStorage.getItem('token')) {
+      show('register-view');
+    }
   </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import BigInteger, String, Boolean, DateTime, Float, Integer, JSON, UniqueConstraint, func
+from datetime import date, datetime
+from sqlalchemy import BigInteger, String, Boolean, Date, DateTime, Float, Integer, JSON, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
@@ -107,3 +107,32 @@ class Settlement(Base):
     pnl: Mapped[float] = mapped_column(Float, nullable=False, comment="盈亏（已按方向计：多=(结算价-开仓价)，空=(开仓价-结算价)，再×手数×乘数）")
     currency: Mapped[str] = mapped_column(String(8), default="CNY", nullable=False, comment="币种 CNY/USD/HKD")
     settled_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="结算时间")
+
+
+class FuturesDailyBar(Base):
+    """国内期货日级历史行情（新浪日K，由 fetch_daily_history.py 拉取）。
+
+    - symbol：新浪合约代码（具体合约如 RB2701），不带 nf_ 前缀
+    - 每行 = 某合约某个交易日的 OHLCV；contract_month 为该合约所属交割月份
+    - (symbol, trade_date) 唯一，重复抓取按此键 upsert（幂等，可增量补数据）
+    """
+    __tablename__ = "futures_daily_bars"
+    __table_args__ = (
+        UniqueConstraint("symbol", "trade_date", name="uq_futures_daily_bars_symbol_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="新浪合约代码（RB0 / RB2701）")
+    trade_date: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="交易日")
+    contract_month: Mapped[date | None] = mapped_column(Date, nullable=True, index=True, comment="所属交割月份（取当月第一天，如 RB2701 → 2027-01-01；连续合约/老式3位代码为 NULL）")
+    open: Mapped[float] = mapped_column("open_price", Float, nullable=True, comment="开盘价")
+    high: Mapped[float] = mapped_column(Float, nullable=True, comment="最高价")
+    low: Mapped[float] = mapped_column(Float, nullable=True, comment="最低价")
+    close: Mapped[float] = mapped_column(Float, nullable=True, comment="收盘价")
+    volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="成交量（手）")
+    open_interest: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="持仓量（手，新浪部分品种缺省）")
+    settlement: Mapped[float | None] = mapped_column(Float, nullable=True, comment="结算价（新浪 s 字段，早期数据可能为 0/缺失）")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"
+    )

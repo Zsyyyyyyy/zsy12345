@@ -1132,7 +1132,7 @@
   settleCancel.addEventListener('click', closeSettleForm);
   settleClose.addEventListener('click', closeSettleForm);
   settleMask.addEventListener('click', (e) => { if (e.target === settleMask) closeSettleForm(); });
-  settlePrice.addEventListener('keydown', (e) => { if (e.key === 'Enter') settlePos(); });
+  settlePrice.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') settlePos(); });
   historyClose.addEventListener('click', () => historyMask.classList.remove('show'));
   historyMask.addEventListener('click', (e) => { if (e.target === historyMask) historyMask.classList.remove('show'); });
   document.addEventListener('keydown', (e) => {
@@ -1150,11 +1150,11 @@
   posClose.addEventListener('click', closePosForm);
   posMask.addEventListener('click', (e) => { if (e.target === posMask) closePosForm(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePosForm(); });
-  posCode.addEventListener('keydown', (e) => { if (e.key === 'Enter') posBuy.focus(); });
+  posCode.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posBuy.focus(); });
   posDir.addEventListener('change', syncDirLabel);
-  posBuy.addEventListener('keydown', (e) => { if (e.key === 'Enter') posLots.focus(); });
-  posLots.addEventListener('keydown', (e) => { if (e.key === 'Enter') posMult.focus(); });
-  posMult.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePos(); });
+  posBuy.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posLots.focus(); });
+  posLots.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posMult.focus(); });
+  posMult.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') savePos(); });
 
   // ===== 走势图（分时 / 日K）=====
   let chartCode = null;
@@ -1481,6 +1481,8 @@
     openAddForm(kw);
   });
   searchInput.addEventListener('keydown', (e) => {
+    // 中文输入法候选词回车确认（isComposing / keyCode 229）不当作搜索回车
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') {
       const first = suggestBox.querySelector('.item');
       // 联想列表已展开时点第一项（内部会关闭联想并打开确认弹窗）

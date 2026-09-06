@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import BigInteger, String, Boolean, DateTime, Float, Integer, JSON, UniqueConstraint, func
+from datetime import date, datetime
+from sqlalchemy import BigInteger, String, Boolean, Date, DateTime, Float, Integer, JSON, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
@@ -18,12 +18,17 @@ class User(Base):
     )
 
 
-class TradableFuture(Base):
-    """国内可交易期货「真实合约」字典（全局共享，按完整合约主键）。
+class FuturesBase(Base):
+    """国内期货「合约库」：当前挂牌 + 历史到期合约（全局共享，按完整合约主键）。
 
-    不再存品种 underlying（如 RB），而是存当前挂牌的真实合约（如 nf_RB2701），
-    由 refresh_tradable_futures.py 每天从新浪拉取一次刷新。持仓接口据此校验：
-    code 以 nf_ 开头时必须精确命中表内 is_active 合约；海外期货/股票/港股不走此校验。
+    只增不改删：refresh_tradable_futures.py（定时）把新浪当前挂牌的新合约补进来
+    （幂等 upsert）；入库过的合约（含到期后不再挂牌的）永不删除、也没有状态位。
+
+    是否「当前可交易」不再用列维护，由调用方按 symbol 交割年月判断：
+    交割月 >= 当前月 即可交易（如 2027-02 时 RB2701 到期、01 合约轮到 RB2801）。
+    持仓接口据此只做格式+日期校验（见 app/routers/history.py validate_position_code），
+    不再命中本表；本表只服务于持仓代码联想 /api/futures-base/search（过滤已到期）
+    与品种字典展示。海外期货/港股/A股 已下线，不纳入持仓。
 
     字段说明：
     - code：带前缀完整合约代码（如 nf_RB2701），与 positions.code 一致，作主键
@@ -31,7 +36,7 @@ class TradableFuture(Base):
     - underlying / underlying_name：品种代码（RB）/ 品种中文名（螺纹钢），用于分组
     - multiplier / tick_size：品种级属性（每点价值/最小变动），刷新时按品种字典填充
     """
-    __tablename__ = "tradable_futures"
+    __tablename__ = "futures_base"
 
     code: Mapped[str] = mapped_column(String(20), primary_key=True, comment="完整合约代码（如 nf_RB2701）")
     symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="不带前缀合约代码（如 RB2701）")
@@ -41,7 +46,6 @@ class TradableFuture(Base):
     exchange: Mapped[str] = mapped_column(String(8), nullable=False, comment="交易所 SHFE/DCE/CZCE/CFFEX/GFEX")
     multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="合约乘数（每点价值，元；新品种可能为空）")
     tick_size: Mapped[float | None] = mapped_column(Float, nullable=True, comment="最小变动价位")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True, comment="是否仍在交易（到期/下架合约置 False 保留历史）")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"
@@ -49,12 +53,12 @@ class TradableFuture(Base):
 
 
 class Position(Base):
-    """期货/股票持仓（行情看板「我的持仓」，按用户隔离；同一品种可建多条）"""
+    """国内期货持仓（行情看板「我的持仓」，按用户隔离；同一品种可建多条）"""
     __tablename__ = "positions"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="所属用户 id")
-    code: Mapped[str] = mapped_column(String(32), nullable=False, comment="品种代码（如 nf_SA2701）")
+    code: Mapped[str] = mapped_column(String(32), nullable=False, comment="国内期货合约代码（如 nf_SA2701；历史遗留非 nf_ 代码仅保留展示）")
     direction: Mapped[str] = mapped_column(
         String(8), default="long", server_default="long", nullable=False,
         comment="方向：long=做多 / short=做空",
@@ -107,3 +111,32 @@ class Settlement(Base):
     pnl: Mapped[float] = mapped_column(Float, nullable=False, comment="盈亏（已按方向计：多=(结算价-开仓价)，空=(开仓价-结算价)，再×手数×乘数）")
     currency: Mapped[str] = mapped_column(String(8), default="CNY", nullable=False, comment="币种 CNY/USD/HKD")
     settled_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="结算时间")
+
+
+class FuturesDailyBar(Base):
+    """国内期货日级历史行情（新浪日K，由 fetch_daily_history.py 拉取）。
+
+    - symbol：新浪合约代码（具体合约如 RB2701），不带 nf_ 前缀
+    - 每行 = 某合约某个交易日的 OHLCV；contract_month 为该合约所属交割月份
+    - (symbol, trade_date) 唯一，重复抓取按此键 upsert（幂等，可增量补数据）
+    """
+    __tablename__ = "futures_daily_bars"
+    __table_args__ = (
+        UniqueConstraint("symbol", "trade_date", name="uq_futures_daily_bars_symbol_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="新浪合约代码（RB0 / RB2701）")
+    trade_date: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="交易日")
+    contract_month: Mapped[date | None] = mapped_column(Date, nullable=True, index=True, comment="所属交割月份（取当月第一天，如 RB2701 → 2027-01-01；连续合约/老式3位代码为 NULL）")
+    open: Mapped[float] = mapped_column("open_price", Float, nullable=True, comment="开盘价")
+    high: Mapped[float] = mapped_column(Float, nullable=True, comment="最高价")
+    low: Mapped[float] = mapped_column(Float, nullable=True, comment="最低价")
+    close: Mapped[float] = mapped_column(Float, nullable=True, comment="收盘价")
+    volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="成交量（手）")
+    open_interest: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="持仓量（手，新浪部分品种缺省）")
+    settlement: Mapped[float | None] = mapped_column(Float, nullable=True, comment="结算价（新浪 s 字段，早期数据可能为 0/缺失）")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"
+    )

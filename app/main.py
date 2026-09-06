@@ -6,10 +6,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.database import Base, engine
 from app.routers.auth import router as auth_router
-from app.routers.futures import router as futures_router
+from app.routers.history import router as history_router
 from app.routers.positions import router as positions_router
+from app.routers.realtime import router as realtime_router
 from app.routers.settlements import router as settlements_router
-from app.routers.tradable_futures import router as tradable_futures_router
 from app.routers.watchlist import router as watchlist_router
 
 # 启动时自动建表（已手动建过则无副作用；生产环境建议换 Alembic 迁移）
@@ -48,14 +48,15 @@ def futures_page():
 # 认证接口：/register、/login、/me
 app.include_router(auth_router)
 
-# 期货行情代理接口：/api/futures、/api/futures/suggest、/api/futures/minline、/api/futures/dailykline
-app.include_router(futures_router)
+# ① 实时行情接口（网页抓取新浪）：/api/futures、suggest、minline、dailykline
+app.include_router(realtime_router)
+
+# ② 历史行情 + 品种信息接口（读数据库，数据由脚本 refresh_tradable_futures.py 定时刷新）：
+#    /api/futures-base*、/api/futures/hist-position、/api/history/dailybars
+app.include_router(history_router)
 
 # 持仓 CRUD 接口：/api/positions
 app.include_router(positions_router)
-
-# 国内期货品种字典接口：/api/tradable-futures
-app.include_router(tradable_futures_router)
 
 # 结算接口：/api/positions/{id}/settle、/api/settlements
 app.include_router(settlements_router)

@@ -4,7 +4,7 @@ import bcrypt
 import jwt
 from dotenv import load_dotenv
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -15,9 +15,11 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+AUTH_COOKIE_NAME = "access_token"
+AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60
+ACCESS_TOKEN_EXPIRE_MINUTES = AUTH_COOKIE_MAX_AGE // 60
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -40,17 +42,22 @@ def decode_access_token(token: str) -> dict:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: str | None = Depends(oauth2_scheme),
+    cookie_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_NAME),
     db: Session = Depends(get_db),
 ) -> User:
-    """公共依赖：从 token 解析出当前登录用户"""
+    """从 Authorization Bearer 或 30 天登录 Cookie 解析当前用户。"""
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="登录已失效，请重新登录",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = decode_access_token(token)
+        # 保留 Bearer 兼容性，浏览器登录优先使用 HttpOnly Cookie。
+        raw_token = token or cookie_token
+        if not raw_token:
+            raise credentials_exc
+        payload = decode_access_token(raw_token)
         user_id = int(payload.get("sub"))
     except Exception:
         raise credentials_exc

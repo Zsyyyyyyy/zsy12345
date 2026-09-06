@@ -121,6 +121,24 @@
   th:first-child, td:first-child { text-align: left; }
   td { border-bottom: 1px solid var(--line); }
   tr:hover td { background: var(--line); }
+  /* 看盘行情表：每个分组表用同一套固定列宽（table-layout:fixed），
+     让「股票/指数/商品期货」各表的表头与数据竖着对齐；
+     # 居中；名称(2)/代码(3) 表头与内容一起左对齐；其余数字列右对齐 */
+  .quote-table { table-layout: fixed; }
+  .quote-table thead th:nth-child(1) { width: 36px; }
+  .quote-table thead th:nth-child(2) { width: 22%; }
+  .quote-table thead th:nth-child(3) { width: 15%; }
+  .quote-table thead th:last-child { width: 7%; }
+  .quote-table th:nth-child(2), .quote-table td:nth-child(2),
+  .quote-table th:nth-child(3), .quote-table td:nth-child(3) { text-align: left; }
+  .quote-table th, .quote-table td { overflow: hidden; text-overflow: ellipsis; }
+  .quote-table th:last-child, .quote-table td:last-child { overflow: visible; }
+  /* 序号列：固定 36px 足够显示两位序号且不截断 */
+  .quote-table th:nth-child(1), .quote-table td:nth-child(1) { padding-left: 4px; padding-right: 4px; overflow: visible; }
+  /* 名称列表头与内容一起右移一点，和序号列留出间隔 */
+  .quote-table th:nth-child(2), .quote-table td:nth-child(2) { padding-left: 14px; }
+  /* 持仓表：名称列(2) 表头跟随内容左对齐 */
+  .pos-table th:nth-child(2), .pos-table td:nth-child(2) { text-align: left; }
   .name { color: var(--text); cursor: pointer; text-align: left; }
   .name:hover { color: var(--accent); }
   td.num, th.num { text-align: center; }
@@ -218,7 +236,7 @@
     <span class="title">leek-futures — 行情看板</span>
     <nav class="nav">
       <div class="nav-group" id="nav-guest">
-        <a class="nav-btn solid" href="/login">登录</a>
+        <a class="nav-btn solid" href="/login?next=/futures">登录</a>
       </div>
       <div class="nav-group hidden" id="nav-user">
         <span class="username" id="nav-username"></span>
@@ -248,9 +266,9 @@
   </header>
 
   <div class="add-row" data-page-node-id="6ZaT0yfeiHUyrgtAePTANQ">
-    <input id="searchInput" placeholder="搜索期货：铜 / 黄金 / IF / 螺纹钢…" data-page-node-id="p4qaLxjgACenaNkWn85uXA">
+    <input id="searchInput" placeholder="搜索期货 / 股票 / 代码…" data-page-node-id="p4qaLxjgACenaNkWn85uXA">
     <button id="addBtn" data-page-node-id="9g7LHC5D8TkN6xcDW3cbfH">添加代码</button>
-    <span class="hint" data-page-node-id="KYiAiTTrBbzN0D7FklaheV">搜索联想选期货；或直接输代码（nf_IF0 / hf_GC / RB0）点添加</span>
+    <span class="hint" data-page-node-id="KYiAiTTrBbzN0D7FklaheV">搜索联想选 A股 / 国内期货；或直接输代码（RB0 / 600519 / nf_IF0）点添加</span>
     <div class="suggest" id="suggestBox" data-page-node-id="pBr2aphNaPgZKGjri6aprV"></div>
   </div>
 
@@ -336,7 +354,6 @@
       <div class="settle-form">
         <label><span>归入分组</span><select id="addGroupSel">
           <option value="国内商品期货">国内商品期货</option>
-          <option value="海外期货">海外期货</option>
           <option value="指数">指数</option>
           <option value="股票">股票</option>
         </select></label>
@@ -369,9 +386,8 @@
 
   const DEFAULT_GROUPS = [
     { name: '股票', codes: ['sh600519', 'sh600036', 'sh601318'] },
-    { name: '指数', codes: ['sh000905', 'sh000688', 'bj899050', 'hkHSTECH', 'sh000001', 'sz399001'] },
+    { name: '指数', codes: ['sh000905', 'sh000688', 'bj899050', 'sh000001', 'sz399001'] },
     { name: '国内商品期货', codes: ['nf_RB0', 'nf_CU0', 'nf_AU0', 'nf_AG0', 'nf_I0', 'nf_M0', 'nf_MA0', 'nf_SC0', 'nf_TA0', 'nf_P0'] },
-    { name: '海外期货', codes: ['hf_OIL', 'hf_CL', 'hf_GC', 'hf_SI', 'hf_NG', 'hf_HG'] },
   ];
 
   const CONFIG_POLL_MS = 3000; // 配置文件轮询间隔（毫秒）
@@ -445,6 +461,7 @@
   applyGray(gray);
 
   let timer = null;
+  let loadSeq = 0;       // 防止刷新期间并发请求按旧顺序覆盖新行情
   let lastDataMap = {};
   let configGroups = null; // 服务端看盘分组（null = 尚未加载，先用默认）
   let configPositions = []; // 持仓（来自数据库 /api/positions）
@@ -455,13 +472,12 @@
     const base = configGroups && configGroups.length ? configGroups : DEFAULT_GROUPS;
     return base.filter((g) => g.codes && g.codes.length > 0);
   }
-  // 按品种代码类型归类到对应的看盘分组名
+  // 按品种代码类型归类到对应的看盘分组名（仅剩 A股 + 国内期货）
   function groupNameFor(code) {
     const c = String(code || '');
     if (/^nf_/.test(c)) return '国内商品期货';
-    if (/^hf_/.test(c)) return '海外期货';
-    // 指数：上证 sh000 / 深证 sz399 / 北证 bj899 / 港股字母指数（如 hkHSTECH）
-    if (/^sh000/.test(c) || /^sz399/.test(c) || /^bj899/.test(c) || /^hk[A-Z]+$/.test(c)) return '指数';
+    // A股指数：上证 sh000 / 深证 sz399 / 北证 bj899
+    if (/^sh000/.test(c) || /^sz399/.test(c) || /^bj899/.test(c)) return '指数';
     return '股票';
   }
 
@@ -472,12 +488,9 @@
     let s = String(raw || '').trim().toUpperCase();
     if (!s) return '';
     if (/^NF_/.test(s)) return s.replace(/^NF_/, 'nf_');
-    if (/^HF_/.test(s)) return s.replace(/^HF_/, 'hf_');
     // 股票 / 指数：带 sh/sz/bj 前缀（如 sh600519 / bj899050），必须是 6 位数字。
     // 注意不能只匹配 \d：SH 同时是烧碱期货品种代码，SH2701（4 位）应归期货而非上交所。
     if (/^(SH|SZ|BJ)\d{6}$/.test(s)) return s.toLowerCase();
-    // 港股：hk 前缀（如 hkHSTECH 恒生科技 / hk00700 腾讯）
-    if (/^HK/.test(s)) return 'hk' + s.slice(2);
     // 纯 6 位数字：先判沪市指数（000 开头的指数代码加 sh 前缀），再按首位判断交易所：6→沪、0/3→深、4/8→北
     if (/^\d{6}$/.test(s)) {
       if (SH_INDEX_TAIL.test(s)) return 'sh' + s;
@@ -485,33 +498,26 @@
       if (/^[03]/.test(s)) return 'sz' + s;
       return 'bj' + s;
     }
+    // 国内期货：字母 + 数字（RB0 / RB2701 / IF0），如 RB2701、SH2701
     if (/^[A-Z]+\d/.test(s)) return 'nf_' + s;
-    return 'hf_' + s;
+    // 其余（海外期货字母 OIL/GC、港股 hkXXX 等已下线）→ 无效代码
+    return '';
   }
-  // 持仓专用代码规范化：与 normalizeCode 的唯一区别是——纯字母（品种名，如 RB）不归一化
-  // 成海外期货，而是返回空串，由调用方提示填写完整合约，从而避免「RB 被当成 hf_RB 放行」。
+  // 持仓专用代码规范化：仅接受国内期货（nf_ 前缀或 字母+3~4位数字 的完整合约），
+  // 其余（股票/港股/海外期货/纯字母品种名）一律返回空串，提示重新填写。
   function normalizePosCode(raw) {
     let s = String(raw || '').trim().toUpperCase();
     if (!s) return '';
     if (/^NF_/.test(s)) return s.replace(/^NF_/, 'nf_');
-    if (/^HF_/.test(s)) return s.replace(/^HF_/, 'hf_');
-    if (/^(SH|SZ|BJ)\d{6}$/.test(s)) return s.toLowerCase();
-    if (/^HK/.test(s)) return 'hk' + s.slice(2);
-    if (/^\d{6}$/.test(s)) {
-      if (SH_INDEX_TAIL.test(s)) return 'sh' + s;
-      if (/^[56]/.test(s)) return 'sh' + s;
-      if (/^[03]/.test(s)) return 'sz' + s;
-      return 'bj' + s;
-    }
     // 国内期货完整合约：字母 + 3~4 位数字（RB2701）
     if (/^[A-Z]{1,4}\d{3,4}$/.test(s)) return 'nf_' + s;
-    // 其余（纯字母品种名 RB/OIL 等）→ 返回空，要求明确填写
+    // 纯字母（如 RB）是品种名缺月份；其余是股票/港股/海外期货 → 都无效
     return '';
   }
   // groupName 省略时按代码类型自动归类；返回是否添加成功
   async function addCode(code, groupName) {
     code = normalizeCode(code);
-    if (!code || allCodes().includes(code)) return false;
+    if (!code || groupCodes().includes(code)) return false;
     const name = groupName || groupNameFor(code);
     const g = configGroups && configGroups.find((x) => x.name === name);
     try {
@@ -552,11 +558,11 @@
     addConfirm.disabled = false;
     // 分组下拉框按代码类型预选，用户可在弹窗里自行改成任意分组
     addGroupSel.value = groupNameFor(code);
-    if (allCodes().includes(code)) {
+    if (groupCodes().includes(code)) {
       addMsg.textContent = '该品种已在看盘清单中';
       addConfirm.disabled = true;
     }
-    addInfo.innerHTML = '代码：<b>' + code + '</b>' + (fallbackName ? '（' + fallbackName + '）' : '') +
+    addInfo.innerHTML = '代码：<b>' + fmtCode(code) + '</b>' + (fallbackName ? '（' + fallbackName + '）' : '') +
       '<br><span class="loading">获取行情…</span>';
     addMask.classList.add('show');
 
@@ -572,7 +578,7 @@
     renderAddInfo(code, d, fallbackName);
   }
   function renderAddInfo(code, d, fallbackName) {
-    let html = '名称：<b>' + ((d && d.name) || fallbackName || '--') + '</b>（' + code + '）<br>' +
+    let html = '名称：<b>' + ((d && d.name) || fallbackName || '--') + '</b>（' + fmtCode(code) + '）<br>' +
       '类型：<b>' + groupNameFor(code) + '</b>';
     if (d && !isNaN(Number(d.price)) && Number(d.price) !== 0) {
       const price = Number(d.price), yest = Number(d.yestclose);
@@ -591,7 +597,7 @@
   function closeAddForm() { addMask.classList.remove('show'); pendingCode = null; }
   async function confirmAdd() {
     if (!pendingCode) return;
-    if (allCodes().includes(pendingCode)) { addMsg.textContent = '该品种已在看盘清单中'; return; }
+    if (groupCodes().includes(pendingCode)) { addMsg.textContent = '该品种已在看盘清单中'; return; }
     const ok = await addCode(pendingCode, addGroupSel.value);
     if (ok) closeAddForm();
   }
@@ -613,9 +619,14 @@
     }
   }
   function allCodes() {
+    // 拉行情用全集：看盘分组 ∪ 持仓（持仓行也要现价算盈亏）
     const base = allGroups().reduce((acc, g) => acc.concat(g.codes), []);
     const pos = (configPositions || []).map((p) => p.code).filter(Boolean);
     return Array.from(new Set(base.concat(pos)));
+  }
+  function groupCodes() {
+    // 左侧「看盘清单」里的代码（判断是否已加分组只能用这个，持仓不算）
+    return Array.from(new Set(allGroups().reduce((acc, g) => acc.concat(g.codes), [])));
   }
 
   // ===== 格式化 =====
@@ -638,6 +649,10 @@
     if (s.includes(':')) return s;
     if (/^\d{6}$/.test(s)) return s.slice(0, 2) + ':' + s.slice(2, 4) + ':' + s.slice(4, 6);
     return s;
+  }
+  // 展示用代码：隐藏 nf_ 前缀（RB2701 / RB0），内部仍用完整代码做行情/增删
+  function fmtCode(code) {
+    return String(code || '').replace(/^nf_/i, '');
   }
 
   // ===== 持仓标记 =====
@@ -674,6 +689,7 @@
       h.textContent = g.name;
       sec.appendChild(h);
       const table = document.createElement('table');
+      table.className = 'quote-table';
       table.innerHTML =
         '<thead><tr><th class="num">#</th><th>名称</th><th>代码</th><th>现价</th><th>涨跌</th><th>涨跌幅</th>' +
         '<th>时间</th><th></th></tr></thead><tbody></tbody>';
@@ -685,7 +701,7 @@
         if (pos) tr.className = 'has-pos';
         if (!d) {
           tr.innerHTML = `<td class="flat num">${idx + 1}</td>` + nameCell(d, code, pos) +
-            `<td class="code">${code}</td><td colspan="4" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
+            `<td class="code">${fmtCode(code)}</td><td colspan="4" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
           tr.querySelector('.del').addEventListener('click', () => removeCode(code));
         } else {
           const price = Number(d.price), yest = Number(d.yestclose);
@@ -699,7 +715,7 @@
           tr.innerHTML =
             `<td class="flat num">${idx + 1}</td>` +
             nameCell(d, code, pos) +
-            `<td class="code">${code}</td>` +
+            `<td class="code">${fmtCode(code)}</td>` +
             `<td class="${cls}">${fmtNum(price)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(updown, 2)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(pct, 2)}%</td>` +
@@ -763,12 +779,14 @@
     const rows = list.map((p) => {
       const d = dataMap[p.code];
       const price = d ? Number(d.price) : NaN;
-      const name = d ? d.name : p.code;
+      const name = d ? d.name : fmtCode(p.code);
       const buy = Number(p.buyPrice);
       const lots = Number(p.lots) || 1;
       const mult = multiplierOf(p);
       const dir = dirOf(p);
-      const diff = diffOf(price, buy, dir);
+      // 历史遗留非国内期货（hf_/hk/股票等）：乘数/价差无意义，只读展示不估盈亏
+      const isNf = /^nf_/i.test(p.code);
+      const diff = (!isNf || isNaN(price) || isNaN(buy)) ? NaN : diffOf(price, buy, dir);
       const pnl = isNaN(diff) ? NaN : diff * lots * mult;
       return { id: p.id, code: p.code, name, price, buy, lots, diff, pnl, dir, currency: currencyOf(p.code) };
     });
@@ -787,21 +805,27 @@
       '<button class="sort-btn" id="historyBtn">结算记录</button>' +
       '<button class="sort-btn" id="sortBtn">盈亏' + (sortDesc ? ' ↓' : ' ↑') + '</button>' +
       '<button class="sort-btn" id="addPosBtn">+ 新增</button></div></div>';
-    html += '<table><thead><tr><th class="num">#</th><th>名称</th><th>方向</th><th>现价</th><th>开仓价</th><th>价差</th><th>手数</th><th>盈亏</th><th></th></tr></thead><tbody>';
+    html += '<table class="pos-table"><thead><tr><th class="num">#</th><th>名称</th><th>方向</th><th>现价</th><th>开仓价</th><th>价差</th><th>手数</th><th>盈亏</th><th></th></tr></thead><tbody>';
     if (!sorted.length) {
       html += '<tr><td colspan="9" class="flat">暂无持仓，点右上角「+ 新增」添加</td></tr>';
     } else {
       sorted.forEach((r, idx) => {
         const cls = !isNaN(r.pnl) ? (r.pnl > 0 ? 'up' : r.pnl < 0 ? 'down' : 'flat') : 'flat';
         const sign = !isNaN(r.diff) && r.diff > 0 ? '+' : '';
-        html += `<tr data-id="${r.id}"><td class="flat num">${idx + 1}</td><td class="name" title="${r.code}">${r.name}</td>` +
+        // 仅国内期货可编辑/结算/查历史位置；历史遗留（hf_/hk/股票等）只读，保留删除
+        const isNf = /^nf_/i.test(r.code);
+        const opPos = /^nf_[A-Z]+\d{4}$/i.test(r.code) ? '<button class="op pos" title="历史价格位置（历年同月合约）">位</button>' : '';
+        const opEdit = isNf ? '<button class="op edit" title="修改">✎</button>' : '';
+        const opSettle = isNf ? '<button class="op settle" title="结算平仓">≡</button>' : '';
+        const legacyTip = isNf ? '' : '（历史遗留记录：持仓/结算仅支持国内期货，此条可删除）';
+        html += `<tr data-id="${r.id}"><td class="flat num">${idx + 1}</td><td class="name" title="${r.code}${legacyTip}">${r.name}</td>` +
           `<td class="${r.dir === 'short' ? 'down' : 'up'}">${dirLabel(r.dir)}</td>` +
           `<td>${isNaN(r.price) ? '--' : fmtNum(r.price)}</td>` +
           `<td>${fmtNum(r.buy)}</td>` +
           `<td class="${cls}">${isNaN(r.diff) ? '--' : sign + fmtNum(r.diff, 2)}</td>` +
           `<td>${r.lots}</td>` +
           `<td class="${cls}">${isNaN(r.pnl) ? '--' : (r.pnl > 0 ? '+' : '') + fmtNum(r.pnl, 0)} ${currencyLabel(r.currency)}</td>` +
-          `<td><button class="op edit" title="修改">✎</button><button class="op settle" title="结算平仓">≡</button><button class="op del" title="删除">×</button></td></tr>`;
+          `<td>${opPos}${opEdit}${opSettle}<button class="op del" title="删除">×</button></td></tr>`;
       });
     }
     html += '</tbody></table>';
@@ -829,6 +853,14 @@
     box.querySelectorAll('.del').forEach((b) => b.addEventListener('click', () => {
       deletePos(Number(b.closest('tr').dataset.id));
     }));
+    box.querySelectorAll('.pos').forEach((b) => b.addEventListener('click', () => {
+      const id = Number(b.closest('tr').dataset.id);
+      const p = configPositions.find((x) => x.id === id);
+      if (!p) return;
+      const qd = lastDataMap[p.code];
+      const price = qd ? Number(qd.price) : NaN;
+      showHistPos(p.code, price);
+    }));
   }
 
   // 方向切换时，开仓价的叫法跟着变（做多=买入价，做空=卖出价）
@@ -847,7 +879,7 @@
     if (!kw) { hidePosSuggest(); return; }
     posSuggestTimer = setTimeout(async () => {
       try {
-        const resp = await fetch('/api/tradable-futures/search?key=' + encodeURIComponent(kw));
+        const resp = await fetch('/api/futures-base/search?key=' + encodeURIComponent(kw));
         const list = await resp.json();
         renderPosSuggest(list || []);
       } catch (e) { hidePosSuggest(); }
@@ -877,7 +909,7 @@
   function openPosForm(pos) {
     editingPosId = pos ? pos.id : null;
     posTitle.textContent = pos ? '修改持仓' : '新增持仓';
-    posCode.value = pos ? pos.code : '';
+    posCode.value = pos ? fmtCode(pos.code) : '';
     posDir.value = pos ? dirOf(pos) : 'long';
     syncDirLabel();
     posBuy.value = pos ? pos.buyPrice : '';
@@ -889,24 +921,16 @@
     posCode.focus();
   }
   function closePosForm() { posMask.classList.remove('show'); }
-  // ===== 登录态：读 token、拼 Authorization 头、401 跳登录页 =====
-  function getToken() {
-    try { return localStorage.getItem('token') || ''; } catch (e) { return ''; }
-  }
+  // ===== 登录态：浏览器自动携带 30 天 HttpOnly Cookie =====
   function authHeaders(extra) {
-    const h = Object.assign({}, extra || {});
-    const t = getToken();
-    if (t) h['Authorization'] = 'Bearer ' + t;
-    return h;
+    return Object.assign({}, extra || {});
   }
-  function toLogin() { location.replace('/login'); }
+  function toLogin() { location.replace('/login?next=/futures'); }
 
-  // ===== 右上角登录态：读 token 调 /me 显示用户名 =====
+  // ===== 右上角登录态：通过 Cookie 调 /me 显示用户名 =====
   async function initNav() {
-    const token = getToken();
-    if (!token) return; // 未登录，保持「登录」按钮
     try {
-      const res = await fetch('/me', { headers: { 'Authorization': 'Bearer ' + token } });
+      const res = await fetch('/me', { credentials: 'include' });
       if (!res.ok) throw new Error();
       const me = await res.json();
       document.getElementById('nav-username').textContent = me.username;
@@ -917,9 +941,9 @@
     }
   }
   function bindLogout() {
-    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
       e.preventDefault();
-      try { localStorage.removeItem('token'); } catch (err) { /* ignore */ }
+      await fetch('/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
       location.reload();
     });
   }
@@ -929,11 +953,11 @@
     const buyRaw = posBuy.value.trim();
     const lotsRaw = posLots.value.trim();
     const multRaw = posMult.value.trim();
-    if (!code) { posMsg.textContent = '请输入完整合约代码（如 RB2701），或从联想列表选择'; return; }
-    // 国内期货：提交前先查 tradable_futures 表，合约存在且 is_active=1 才允许添加
+    if (!code) { posMsg.textContent = '请输入国内期货合约代码（如 RB2701 / nf_RB2701），或从联想列表选择'; return; }
+    // 国内期货：提交前调 validate 校验「交割月 >= 当前月」是否可交易（不再查表/is_active）
     if (code.startsWith('nf_')) {
       try {
-        const vr = await fetch('/api/tradable-futures/validate', {
+        const vr = await fetch('/api/futures-base/validate', {
           method: 'POST',
           headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ codes: [code] }),
@@ -1002,12 +1026,12 @@
     if (!p) return;
     settlingPosId = id;
     const d = lastDataMap[p.code];
-    const name = d ? d.name : p.code;
+    const name = d ? d.name : fmtCode(p.code);
     const curPrice = d ? Number(d.price) : NaN;
     const cur = isNaN(curPrice) ? '--' : fmtNum(curPrice);
     const totalLots = Number(p.lots) || 0;
     settleTitle.textContent = '结算持仓';
-    settleInfo.innerHTML = '品种：<b>' + name + '</b>（' + p.code + '）<br>' +
+    settleInfo.innerHTML = '品种：<b>' + name + '</b>（' + fmtCode(p.code) + '）<br>' +
       '方向：<b>' + dirLabel(dirOf(p)) + '</b> · 开仓价：<b>' + fmtNum(Number(p.buyPrice)) + '</b> · 持仓手数：<b>' + totalLots + '</b> · 现价：<b>' + cur + '</b>';
     settlePrice.value = isNaN(curPrice) ? '' : curPrice;
     settleLots.value = totalLots;  // 默认按全部手数结算
@@ -1101,7 +1125,7 @@
   settleCancel.addEventListener('click', closeSettleForm);
   settleClose.addEventListener('click', closeSettleForm);
   settleMask.addEventListener('click', (e) => { if (e.target === settleMask) closeSettleForm(); });
-  settlePrice.addEventListener('keydown', (e) => { if (e.key === 'Enter') settlePos(); });
+  settlePrice.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') settlePos(); });
   historyClose.addEventListener('click', () => historyMask.classList.remove('show'));
   historyMask.addEventListener('click', (e) => { if (e.target === historyMask) historyMask.classList.remove('show'); });
   document.addEventListener('keydown', (e) => {
@@ -1119,11 +1143,11 @@
   posClose.addEventListener('click', closePosForm);
   posMask.addEventListener('click', (e) => { if (e.target === posMask) closePosForm(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePosForm(); });
-  posCode.addEventListener('keydown', (e) => { if (e.key === 'Enter') posBuy.focus(); });
+  posCode.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posBuy.focus(); });
   posDir.addEventListener('change', syncDirLabel);
-  posBuy.addEventListener('keydown', (e) => { if (e.key === 'Enter') posLots.focus(); });
-  posLots.addEventListener('keydown', (e) => { if (e.key === 'Enter') posMult.focus(); });
-  posMult.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePos(); });
+  posBuy.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posLots.focus(); });
+  posLots.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posMult.focus(); });
+  posMult.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') savePos(); });
 
   // ===== 走势图（分时 / 日K）=====
   let chartCode = null;
@@ -1304,6 +1328,73 @@
     chartSub.textContent = symbol + ' · 最近 ' + n + ' 根日K';
   }
   function closeChart() { chartMask.classList.remove('show'); }
+
+  // ===== 历史价格位置：当前价在历年同月合约合并区间里的位置 =====
+  function hpCss() {
+    if (document.getElementById('hpStyle')) return;
+    const st = document.createElement('style');
+    st.id = 'hpStyle';
+    st.textContent = [
+      '.hp-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;}',
+      '.hp-panel{background:var(--panel,#151515);color:var(--fg,#e6edf3);border:1px solid var(--line,#2a2a2a);border-radius:12px;padding:18px 22px;width:min(600px,92vw);max-height:82vh;overflow:auto;position:relative;font-size:13px;box-shadow:0 8px 40px rgba(0,0,0,.5);}',
+      '.hp-close{position:absolute;right:12px;top:6px;cursor:pointer;font-size:20px;color:var(--muted,#8b949e);line-height:1;}',
+      '.hp-panel h3{margin:0 0 10px;font-size:15px;}',
+      '.hp-sub{color:var(--muted,#8b949e);margin:4px 0 12px;}',
+      '.hp-big{font-size:26px;font-weight:700;margin-bottom:2px;}',
+      '.hp-scale{position:relative;height:10px;border-radius:5px;margin:12px 0 2px;background:linear-gradient(90deg,#2ec27e,#eac54f,#ff5c5c);}',
+      '.hp-marker{position:absolute;top:-4px;width:3px;height:18px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 6px rgba(0,0,0,.8);}',
+      '.hp-axis{display:flex;justify-content:space-between;color:var(--muted,#8b949e);font-size:11px;margin-bottom:8px;}',
+      '.hp-years{margin-top:10px;border-top:1px solid var(--line,#2a2a2a);padding-top:8px;color:var(--muted,#8b949e);line-height:1.9;}',
+      '.hp-years b{color:var(--fg,#e6edf3);}',
+      '.hp-err{color:#ff5c5c;margin-top:8px;}'
+    ].join('\n');
+    document.head.appendChild(st);
+  }
+  function hpEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  async function showHistPos(code, price) {
+    hpCss();
+    const overlay = document.createElement('div');
+    overlay.className = 'hp-ov';
+    const panel = document.createElement('div');
+    panel.className = 'hp-panel';
+    panel.innerHTML = '<span class="hp-close">×</span><h3>历史价格位置</h3><div class="hp-sub">计算中…</div>';
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    panel.querySelector('.hp-close').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    const url = '/api/futures/hist-position?code=' + encodeURIComponent(code) +
+      (Number.isFinite(price) ? '&price=' + encodeURIComponent(String(price)) : '');
+    try {
+      const resp = await fetch(url);
+      const j = await resp.json();
+      const f = (v, d) => { const n = Number(v); return Number.isFinite(n) ? (d === undefined ? fmtNum(n) : fmtNum(n, d)) : '--'; };
+      if (!j.ok) {
+        panel.innerHTML = '<span class="hp-close">×</span><h3>历史价格位置 · ' + hpEsc(j.code || code) + '</h3><div class="hp-err">' + hpEsc(j.reason || '暂无数据') + '</div>';
+        panel.querySelector('.hp-close').addEventListener('click', close);
+        return;
+      }
+      const s = j.stats;
+      const years = (j.per_year || []).map((y) => `<div><b>${hpEsc(y.symbol)}</b>　${y.days}天　${f(y.min)} ~ ${f(y.max)}</div>`).join('');
+      const skip = (j.skipped_years && j.skipped_years.length) ? '<div class="hp-years">未纳入（新浪无更早数据）：' + hpEsc(j.skipped_years.join('、')) + '</div>' : '';
+      const span = (s.max - s.min) > 0 ? Math.max(0, Math.min(100, (j.price - s.min) / (s.max - s.min) * 100)) : 50;
+      panel.innerHTML =
+        '<span class="hp-close">×</span>' +
+        '<h3>历史价格位置 · ' + hpEsc(j.code) + '</h3>' +
+        '<div class="hp-sub">交割月 ' + hpEsc(j.delivery_month) + ' · 现价 <b>' + f(j.price) + '</b> · 对比历年同月合约 <b>' + s.days + '</b> 个交易日</div>' +
+        '<div class="hp-big">' + s.pct + '%</div>' +
+        '<div class="hp-sub">高于同月历史合约 ' + s.pct + '% 的交易日（越接近 100% 越处于历史高位）</div>' +
+        '<div class="hp-scale"><div class="hp-marker" style="left:' + span + '%"></div></div>' +
+        '<div class="hp-axis"><span>' + f(s.min) + '</span><span>中位 ' + f(s.median) + '</span><span>' + f(s.max) + '</span></div>' +
+        '<div class="hp-years">历年同月合约区间：<br>' + years + '</div>' + skip;
+      panel.querySelector('.hp-close').addEventListener('click', close);
+    } catch (e) {
+      panel.innerHTML = '<span class="hp-close">×</span><h3>历史价格位置</h3><div class="hp-err">加载失败：' + hpEsc(String(e)) + '</div>';
+      panel.querySelector('.hp-close').addEventListener('click', close);
+    }
+  }
   chartClose.addEventListener('click', closeChart);
   chartMask.addEventListener('click', (e) => { if (e.target === chartMask) closeChart(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChart(); });
@@ -1333,7 +1424,7 @@
       const div = document.createElement('div');
       div.className = 'item';
       div.innerHTML =
-        `<span class="nm">${it.name}</span><span class="cd">${it.code}</span><span class="mk">${it.market}</span>`;
+        `<span class="nm">${it.name}</span><span class="cd">${fmtCode(it.code)}</span><span class="mk">${it.market}</span>`;
       div.addEventListener('click', () => {
         hideSuggest();
         searchInput.value = '';
@@ -1349,12 +1440,20 @@
 
   // ===== 行情加载 =====
   async function load() {
+    const requestSeq = ++loadSeq;
     const codes = allCodes();
-    if (!codes.length) { render({}); updateTime.textContent = '无数据'; return; }
+    if (!codes.length) {
+      if (requestSeq !== loadSeq) return;
+      render({});
+      updateTime.textContent = '无数据';
+      return;
+    }
     try {
       const resp = await fetch('/api/futures?codes=' + encodeURIComponent(codes.join(',')));
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const json = await resp.json();
+      // 配置/定时刷新期间可能同时发起多次请求，旧响应不能覆盖新响应
+      if (requestSeq !== loadSeq) return;
       const list = json.items || [];
       const map = {};
       list.forEach((it) => { map[it.code] = it; });
@@ -1363,6 +1462,7 @@
       banner.style.display = 'none';
       updateTime.textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
     } catch (e) {
+      if (requestSeq !== loadSeq) return;
       banner.style.display = 'block';
       updateTime.textContent = '连接失败';
     }
@@ -1383,6 +1483,8 @@
     openAddForm(kw);
   });
   searchInput.addEventListener('keydown', (e) => {
+    // 中文输入法候选词回车确认（isComposing / keyCode 229）不当作搜索回车
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') {
       const first = suggestBox.querySelector('.item');
       // 联想列表已展开时点第一项（内部会关闭联想并打开确认弹窗）
@@ -1395,7 +1497,7 @@
   });
 
   // ===== 配置文件实时同步 =====
-  async function loadConfig(force) {
+  async function loadConfig(force, triggerLoad = true) {
     try {
       const resp = await fetch('/api/groups?t=' + Date.now(), { headers: authHeaders() });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1408,13 +1510,13 @@
               name: String(g.name || '未命名'),
               codes: (Array.isArray(g.codes) ? g.codes : []).map(normalizeCode).filter(Boolean),
             }));
-        load();
+        if (triggerLoad) load();
       }
     } catch (e) {
       // 拉取失败时沿用默认分组
     }
   }
-  async function loadPositions() {
+  async function loadPositions(triggerLoad = true) {
     // 持仓来自数据库 /api/positions，不再读 config.json
     try {
       const resp = await fetch('/api/positions', { headers: authHeaders() });
@@ -1423,7 +1525,8 @@
       const ps = await resp.json();
       configPositions = ps.map((p) => ({
         id: p.id,
-        code: normalizeCode(p.code),
+        // 历史遗留的 hf_/hk 等已下线代码保留原样（只读展示，供删除）；其余统一规范化
+        code: normalizeCode(p.code) || String(p.code || '').toLowerCase(),
         direction: p.direction || 'long',
         buyPrice: Number(p.buy_price),
         lots: Number(p.lots) || 1,
@@ -1432,14 +1535,20 @@
     } catch (e) {
       configPositions = [];
     }
-    load();
+    if (triggerLoad) load();
+  }
+
+  async function initialLoad() {
+    // 首次刷新先同时加载分组和持仓，等两者就绪后只发起一次行情请求。
+    // 避免默认分组/旧请求的响应把 RB2703 等自定义合约覆盖掉。
+    await Promise.all([loadPositions(false), loadConfig(true, false)]);
+    await load();
   }
 
   setupTimer();
   initNav();
   bindLogout();
-  loadPositions();
-  loadConfig(true);
+  initialLoad();
   setInterval(() => loadConfig(false), CONFIG_POLL_MS);
 })();
 </script>

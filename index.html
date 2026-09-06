@@ -254,12 +254,10 @@
 </div>
 
 <script>
-    // 根据本地 token 判断登录态，切换右上角按钮
+    // 通过 HttpOnly Cookie 请求当前用户，切换右上角按钮
     async function initNav() {
-        const token = localStorage.getItem('token');
-        if (!token) return; // 未登录，保持默认「注册 / 登录」
         try {
-            const res = await fetch('/me', { headers: { 'Authorization': 'Bearer ' + token } });
+            const res = await fetch('/me', { credentials: 'include' });
             if (!res.ok) throw new Error();
             const me = await res.json();
             document.getElementById('nav-username').textContent = me.username;
@@ -270,9 +268,9 @@
         }
     }
 
-    function logout(e) {
+    async function logout(e) {
         e.preventDefault();
-        localStorage.removeItem('token');
+        await fetch('/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
         window.location.reload();
     }
 

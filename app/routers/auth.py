@@ -1,9 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import hash_password, verify_password, create_access_token, get_current_user
+from app.core.security import (
+    AUTH_COOKIE_MAX_AGE,
+    AUTH_COOKIE_NAME,
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+)
 from app.models import User
 from app.schemas import UserRegister, UserLogin, Token, UserOut
 
@@ -29,7 +38,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(data: UserLogin, db: Session = Depends(get_db)):
+def login(data: UserLogin, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.username == data.username))
 
     # 用户不存在 / 密码错误统一返回 401，不暴露具体是哪一项
@@ -40,10 +49,23 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
         )
 
     token = create_access_token(user.id, user.username)
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        max_age=AUTH_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=os.getenv("COOKIE_SECURE", "0") == "1",
+    )
     return Token(access_token=token)
+
+
+@router.post("/logout", status_code=204)
+def logout(response: Response):
+    response.delete_cookie(key=AUTH_COOKIE_NAME, httponly=True, samesite="lax")
 
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
-    """受保护接口：需在请求头带 Authorization: Bearer <token>"""
+    """受保护接口：浏览器自动携带登录 Cookie，也兼容 Bearer Token。"""
     return user

@@ -921,24 +921,16 @@
     posCode.focus();
   }
   function closePosForm() { posMask.classList.remove('show'); }
-  // ===== 登录态：读 token、拼 Authorization 头、401 跳登录页 =====
-  function getToken() {
-    try { return localStorage.getItem('token') || ''; } catch (e) { return ''; }
-  }
+  // ===== 登录态：浏览器自动携带 30 天 HttpOnly Cookie =====
   function authHeaders(extra) {
-    const h = Object.assign({}, extra || {});
-    const t = getToken();
-    if (t) h['Authorization'] = 'Bearer ' + t;
-    return h;
+    return Object.assign({}, extra || {});
   }
   function toLogin() { location.replace('/login?next=/futures'); }
 
-  // ===== 右上角登录态：读 token 调 /me 显示用户名 =====
+  // ===== 右上角登录态：通过 Cookie 调 /me 显示用户名 =====
   async function initNav() {
-    const token = getToken();
-    if (!token) return; // 未登录，保持「登录」按钮
     try {
-      const res = await fetch('/me', { headers: { 'Authorization': 'Bearer ' + token } });
+      const res = await fetch('/me', { credentials: 'include' });
       if (!res.ok) throw new Error();
       const me = await res.json();
       document.getElementById('nav-username').textContent = me.username;
@@ -949,9 +941,9 @@
     }
   }
   function bindLogout() {
-    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
       e.preventDefault();
-      try { localStorage.removeItem('token'); } catch (err) { /* ignore */ }
+      await fetch('/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
       location.reload();
     });
   }

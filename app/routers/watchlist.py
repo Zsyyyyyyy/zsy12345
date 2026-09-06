@@ -7,7 +7,7 @@
 港股(hk) 已下线，接口在读写分组时自动把这些代码从 codes 里剔除
 （库中旧数据保留，读出即过滤；再保存时写回的是过滤后的列表）。
 
-接口（均需登录，Header 带 Authorization: Bearer <token>）：
+接口（均需登录，浏览器使用登录 Cookie；API 客户端可带 Authorization: Bearer <token>）：
   GET    /api/groups           读当前用户全部分组（按 sort_order、id 升序）
   POST   /api/groups           新增分组（同一用户内 name 唯一，重复返回 409）
   PUT    /api/groups/{id}      修改分组（字段可选，只更新传入项）

@@ -6,7 +6,7 @@
 结算只针对国内期货（nf_ 开头）持仓：历史遗留的海外期货/港股/股票持仓为
 只读记录，不可结算，需先删除。结算币种固定人民币 CNY。
 
-接口（均需登录，Header 带 Authorization: Bearer <token>）：
+接口（均需登录，浏览器使用登录 Cookie；API 客户端可带 Authorization: Bearer <token>）：
   POST /api/positions/{pos_id}/settle   结算某条持仓（传结算价 + 可选手数）
                                        不传手数 = 按持仓剩余手数全部平仓；传手数 = 部分结算
                                        剩余手数继续留在 positions 表

@@ -7,7 +7,7 @@
 （不再查 futures_base / is_active，直接按 symbol 判定，如 2027-02 时 RB2701
 到期不可用、01 合约轮到 RB2801）。历史遗留的非 nf_ 持仓保留为只读。
 
-接口（均需登录，Header 带 Authorization: Bearer <token>）：
+接口（均需登录，浏览器使用登录 Cookie；API 客户端可带 Authorization: Bearer <token>）：
   GET    /api/positions          读当前用户全部持仓
   POST   /api/positions          新增（同品种可建多条，不校验唯一性）
   PUT    /api/positions/{id}     修改（字段可选，只更新传入项）

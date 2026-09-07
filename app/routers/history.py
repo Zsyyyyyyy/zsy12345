@@ -185,8 +185,8 @@ BATCH_SIZE = 500  # 每批 upsert 行数
 
 
 
-def contract_month_of(symbol: str) -> date | None:
-    """从合约代码解析所属交割月份。RB2701 → 2027-01-01；无法解析返回 None。
+def contract_month_of(symbol: str) -> int | None:
+    """从合约代码解析所属交割月份。RB2701 → 1、RB2711 → 11；无法解析返回 None。
 
     仅支持当前通行的 4 位年月编码；郑商所 2019 年前的 3 位老编码（如 AP901）不适用。
     """
@@ -194,10 +194,10 @@ def contract_month_of(symbol: str) -> date | None:
     if not m:
         return None
     yymm = m.group(2)
-    year, month = 2000 + int(yymm[:2]), int(yymm[2:])
+    month = int(yymm[2:])
     if not 1 <= month <= 12:
         return None
-    return date(year, month, 1)
+    return month
 
 
 def _to_float(s) -> float | None:
@@ -216,6 +216,8 @@ def _to_int(s) -> int | None:
 def _parse_kline_rows(symbol: str, data: list[dict]) -> list[dict]:
     """新浪日K原始行 -> 表行。过滤无日期/无价格的脏行。"""
     month = contract_month_of(symbol)
+    um = re.match(r'^([A-Za-z]+)', (symbol or '').strip())
+    underlying = um.group(1).upper() if um else None
     rows = []
     for d in data:
         day = (d.get('d') or '').strip()
@@ -228,6 +230,7 @@ def _parse_kline_rows(symbol: str, data: list[dict]) -> list[dict]:
             continue  # 无成交的老合约日K可能是全 0 占位
         rows.append({
             'symbol': symbol,
+            'underlying': underlying,
             'trade_date': trade_date,
             'contract_month': month,
             'open_price': _to_float(d.get('o')),
@@ -251,6 +254,7 @@ def _upsert_daily_bars(db: Session, rows: list[dict], dry_run: bool) -> int:
         batch = rows[i:i + BATCH_SIZE]
         stmt = mysql_insert(FuturesDailyBar).values(batch)
         stmt = stmt.on_duplicate_key_update(
+            underlying=stmt.inserted.underlying,
             contract_month=stmt.inserted.contract_month,
             open_price=stmt.inserted.open_price,
             high=stmt.inserted.high,

@@ -64,7 +64,12 @@ app.include_router(settlements_router)
 # 看盘分组 CRUD 接口：/api/groups
 app.include_router(watchlist_router)
 
-# 显式挂载各静态工具子目录（排除 futures：其前端由 /futures 路由提供，避免暴露源码/配置）
-_MODULE_DIRS = ["hash", "currency-converter", "fortune", "timestamp", "tetris", "zhconvert", "notes", "price-calc", "lib"]
-for _name in _MODULE_DIRS:
-    app.mount(f"/modules/{_name}", StaticFiles(directory=BASE_DIR / "modules" / _name), name=f"modules_{_name}")
+# 自动发现 modules/ 下的静态工具子目录并挂载，约定：目录名即模块名，入口为 <模块名>.html
+# 新增工具：在 modules/ 下建目录 + 放同名 .html，重启服务即生效，无需改这里。
+# 排除项：futures 走独立 /futures 路由（避免暴露 README 等非前端文件）；下划线开头的目录跳过。
+_MODULE_EXCLUDES = {"futures"}
+_MODULES_DIR = BASE_DIR / "modules"
+for _mod_dir in sorted(_MODULES_DIR.iterdir()):
+    if not _mod_dir.is_dir() or _mod_dir.name.startswith("_") or _mod_dir.name in _MODULE_EXCLUDES:
+        continue
+    app.mount(f"/modules/{_mod_dir.name}", StaticFiles(directory=_mod_dir), name=f"modules_{_mod_dir.name}")

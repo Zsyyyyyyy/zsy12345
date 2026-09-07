@@ -1,7 +1,6 @@
 from app.schemas.schemas import (
     UserRegister,
     UserLogin,
-    Token,
     UserOut,
     PositionCreate,
     PositionUpdate,
@@ -15,7 +14,7 @@ from app.schemas.schemas import (
 )
 
 __all__ = [
-    "UserRegister", "UserLogin", "Token", "UserOut",
+    "UserRegister", "UserLogin", "UserOut",
     "PositionCreate", "PositionUpdate", "PositionOut",
     "SettlementCreate", "SettlementOut",
     "WatchGroupCreate", "WatchGroupUpdate", "WatchGroupOut",

@@ -53,8 +53,8 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # 保留 Bearer 兼容性，浏览器登录优先使用 HttpOnly Cookie。
-        raw_token = token or cookie_token
+        # 浏览器使用 HttpOnly Cookie；保留 Bearer 仅便于后端接口测试和内部调用。
+        raw_token = cookie_token or token
         if not raw_token:
             raise credentials_exc
         payload = decode_access_token(raw_token)

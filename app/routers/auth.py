@@ -14,7 +14,7 @@ from app.core.security import (
     get_current_user,
 )
 from app.models import User
-from app.schemas import UserRegister, UserLogin, Token, UserOut
+from app.schemas import UserRegister, UserLogin, UserOut
 
 router = APIRouter(tags=["auth"])
 
@@ -37,7 +37,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", status_code=status.HTTP_204_NO_CONTENT)
 def login(data: UserLogin, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.username == data.username))
 
@@ -57,7 +57,8 @@ def login(data: UserLogin, response: Response, db: Session = Depends(get_db)):
         samesite="lax",
         secure=os.getenv("COOKIE_SECURE", "0") == "1",
     )
-    return Token(access_token=token)
+    # 直接返回传入的 Response，确保 Set-Cookie 头不会被新的 Response 覆盖。
+    return None
 
 
 @router.post("/logout", status_code=204)

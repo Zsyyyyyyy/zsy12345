@@ -13,19 +13,21 @@ refresh_contracts 语义（只加不删，无 is_active）：
 因此本脚本不需要维护 is_active、也不做下架扫描。
 
 用法（在项目根目录）：
-    venv/bin/python refresh_tradable_futures.py            # 拉取 + upsert（人类可读输出）
-    venv/bin/python refresh_tradable_futures.py --json     # 只输出 JSON 结果（机器可读）
-    venv/bin/python refresh_tradable_futures.py --dry-run  # 只看不写
+    venv/bin/python scripts/refresh_tradable_futures.py            # 拉取 + upsert（人类可读输出）
+    venv/bin/python scripts/refresh_tradable_futures.py --json     # 只输出 JSON 结果（机器可读）
+    venv/bin/python scripts/refresh_tradable_futures.py --dry-run  # 只看不写
 """
 import argparse
 import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # 项目根目录（app 包所在）
 
 from app.core.database import Base, engine, SessionLocal
 from app.routers.history import refresh_contracts
+
+engine.echo = False  # 关闭脚本进程内 SQL 日志，避免刷屏（不影响 app）
 
 
 def main():

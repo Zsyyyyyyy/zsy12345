@@ -29,6 +29,8 @@ router = APIRouter(tags=["watchlist"])
 
 # A股证券/指数代码：sh600519 / sz000001 / bj899050
 _A_SHARE_RE = re.compile(r'^(sh|sz|bj)\d{6}$')
+_EQUITY_GROUP_NAMES = {'股票', '指数', '股票指数'}
+_EQUITY_GROUP_NAME = '股票指数'
 
 
 def _is_supported_code(code: str) -> bool:
@@ -50,6 +52,34 @@ def _filter_codes(codes) -> list[str]:
     return out
 
 
+def _canonical_group_name(name: str) -> str:
+    """股票和指数在数据库中统一使用同一个分组名。"""
+    return _EQUITY_GROUP_NAME if name in _EQUITY_GROUP_NAMES else name
+
+
+def _merge_equity_groups(db: Session, user_id: int) -> None:
+    """把旧的「股票」「指数」记录合并为「股票指数」。"""
+    groups = db.scalars(
+        select(WatchGroup)
+        .where(WatchGroup.user_id == user_id, WatchGroup.name.in_(_EQUITY_GROUP_NAMES))
+        .order_by(WatchGroup.sort_order, WatchGroup.id)
+    ).all()
+    if not groups:
+        return
+
+    target = next((g for g in groups if g.name == _EQUITY_GROUP_NAME), groups[0])
+    merged_codes = _filter_codes(code for g in groups for code in (g.codes or []))
+    changed = target.name != _EQUITY_GROUP_NAME or target.codes != merged_codes
+    target.name = _EQUITY_GROUP_NAME
+    target.codes = merged_codes
+    for group in groups:
+        if group.id != target.id:
+            db.delete(group)
+            changed = True
+    if changed:
+        db.commit()
+
+
 def _sanitize_group(g: WatchGroup) -> WatchGroup:
     """返回过滤掉下线代码后的分组对象（不落库，仅作用于本次响应）。"""
     g.codes = _filter_codes(g.codes)
@@ -62,6 +92,7 @@ def list_groups(
     db: Session = Depends(get_db),
 ):
     """读当前用户全部分组，按 sort_order、id 升序（hf_/hk 等已下线代码自动剔除）。"""
+    _merge_equity_groups(db, user.id)
     groups = db.scalars(
         select(WatchGroup).where(WatchGroup.user_id == user.id)
         .order_by(WatchGroup.sort_order, WatchGroup.id)
@@ -76,11 +107,13 @@ def create_group(
     db: Session = Depends(get_db),
 ):
     """新增分组。同一用户内 name 已存在则返回 409；codes 自动过滤下线代码。"""
-    if db.scalar(select(WatchGroup).where(WatchGroup.user_id == user.id, WatchGroup.name == data.name)):
+    _merge_equity_groups(db, user.id)
+    group_name = _canonical_group_name(data.name)
+    if db.scalar(select(WatchGroup).where(WatchGroup.user_id == user.id, WatchGroup.name == group_name)):
         raise HTTPException(status_code=409, detail="该分组名已存在")
     g = WatchGroup(
         user_id=user.id,
-        name=data.name,
+        name=group_name,
         codes=_filter_codes(data.codes),
         sort_order=data.sort_order,
     )
@@ -98,12 +131,14 @@ def update_group(
     db: Session = Depends(get_db),
 ):
     """修改分组。仅更新显式传入的字段；codes 更新时自动过滤下线代码。"""
+    _merge_equity_groups(db, user.id)
     g = db.scalar(select(WatchGroup).where(WatchGroup.id == group_id, WatchGroup.user_id == user.id))
     if g is None:
         raise HTTPException(status_code=404, detail="分组不存在")
 
     updates = data.model_dump(exclude_unset=True)
     if updates.get("name") is not None:
+        updates["name"] = _canonical_group_name(updates["name"])
         dup = db.scalar(select(WatchGroup).where(
             WatchGroup.user_id == user.id,
             WatchGroup.name == updates["name"],

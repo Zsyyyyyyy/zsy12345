@@ -32,10 +32,12 @@ def list_positions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """读当前用户全部持仓，按 id 升序。"""
-    return db.scalars(
+    """只读当前用户的国内期货持仓，按 id 升序。"""
+    positions = db.scalars(
         select(Position).where(Position.user_id == user.id).order_by(Position.id)
     ).all()
+    # 兼容旧库中的股票/指数历史记录，但不再把它们作为持仓返回。
+    return [position for position in positions if position.code.startswith('nf_')]
 
 
 @router.post("/api/positions", response_model=PositionOut, status_code=status.HTTP_201_CREATED)

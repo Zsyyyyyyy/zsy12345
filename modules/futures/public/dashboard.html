@@ -354,8 +354,7 @@
       <div class="settle-form">
         <label><span>归入分组</span><select id="addGroupSel">
           <option value="国内商品期货">国内商品期货</option>
-          <option value="指数">指数</option>
-          <option value="股票">股票</option>
+          <option value="股票指数">股票指数</option>
         </select></label>
         <div class="row-btns">
           <button id="addCancel">取消</button>
@@ -385,8 +384,7 @@
   'use strict';
 
   const DEFAULT_GROUPS = [
-    { name: '股票', codes: ['sh600519', 'sh600036', 'sh601318'] },
-    { name: '指数', codes: ['sh000905', 'sh000688', 'bj899050', 'sh000001', 'sz399001'] },
+    { name: '股票指数', codes: ['sh600519', 'sh600036', 'sh601318', 'sh000905', 'sh000688', 'bj899050', 'sh000001', 'sz399001'] },
     { name: '国内商品期货', codes: ['nf_RB0', 'nf_CU0', 'nf_AU0', 'nf_AG0', 'nf_I0', 'nf_M0', 'nf_MA0', 'nf_SC0', 'nf_TA0', 'nf_P0'] },
   ];
 
@@ -472,13 +470,11 @@
     const base = configGroups && configGroups.length ? configGroups : DEFAULT_GROUPS;
     return base.filter((g) => g.codes && g.codes.length > 0);
   }
-  // 按品种代码类型归类到对应的看盘分组名（仅剩 A股 + 国内期货）
+  // 按品种代码类型归类到对应的看盘分组名（股票和指数统一）
   function groupNameFor(code) {
     const c = String(code || '');
     if (/^nf_/.test(c)) return '国内商品期货';
-    // A股指数：上证 sh000 / 深证 sz399 / 北证 bj899
-    if (/^sh000/.test(c) || /^sz399/.test(c) || /^bj899/.test(c)) return '指数';
-    return '股票';
+    return '股票指数';
   }
 
   // 沪市指数代码（纯 6 位数字、000 开头）：这些是上证/中证系列指数，需加 sh 前缀，

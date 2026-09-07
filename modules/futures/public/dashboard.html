@@ -233,7 +233,7 @@
     <a class="tdot red" href="/" aria-label="返回首页" title="关闭（返回首页）"></a>
     <span class="tdot yellow"></span>
     <span class="tdot green"></span>
-    <span class="title">leek-futures — 行情看板</span>
+    <span class="title">futures — 行情看板</span>
     <nav class="nav">
       <div class="nav-group" id="nav-guest">
         <a class="nav-btn solid" href="/login?next=/futures">登录</a>
@@ -245,7 +245,7 @@
     </nav>
   </div>
 
-  <div class="prompt-line"><span class="user">zsy</span><span class="p">@</span><span class="host">macbook</span><span class="p">:</span><span class="path">~/futures</span><span class="p">$</span> leek-futures --watch</div>
+  <div class="prompt-line"><span class="user">zsy</span><span class="p">@</span><span class="host">macbook</span><span class="p">:</span><span class="path">~/futures</span><span class="p">$</span> futures --watch</div>
 
   <div class="content">
   <div class="banner" id="banner" data-page-node-id="CAYcXKSx0DK2DXikToLxUp">无法连接行情服务，请确认后端已启动后刷新重试。</div>
@@ -256,8 +256,8 @@
     <span class="spacer" data-page-node-id="Bizo5JmkBN3pugG4LP8FZH"></span>
     <label class="status" data-page-node-id="tZb4DyDtYBTZdNemox56JE">刷新间隔</label>
     <select id="interval" data-page-node-id="m4OlGrlugFPhd5yMBPdYVH">
-      <option value="3000" data-page-node-id="GNJq8jGv6ARuhJ56ZDGDiB">3 秒</option>
-      <option value="5000" selected data-page-node-id="dB5wLIkHQQCYjTE3GpIqoQ">5 秒</option>
+      <option value="3000" selected data-page-node-id="GNJq8jGv6ARuhJ56ZDGDiB">3 秒</option>
+      <option value="5000" data-page-node-id="dB5wLIkHQQCYjTE3GpIqoQ">5 秒</option>
       <option value="10000" data-page-node-id="ibTMTSyspITHEmKLEyR8EC">10 秒</option>
       <option value="30000" data-page-node-id="9QCf51WkpKCau4f6NRCFRx">30 秒</option>
       <option value="0" data-page-node-id="RFBb7THvxklGBfcHjLSniO">暂停</option>
@@ -436,7 +436,7 @@
   const addMsg = document.getElementById('addMsg');
 
   // ===== 一键灰度（黑白）切换 =====
-  const THEME_KEY = 'leek-futures-gray';
+  const THEME_KEY = 'futures-gray';
   const themeToggle = document.getElementById('themeToggle');
   const themeIco = document.getElementById('themeIco');
   const themeLabel = document.getElementById('themeLabel');

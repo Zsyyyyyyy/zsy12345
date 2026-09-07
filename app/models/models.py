@@ -127,8 +127,9 @@ class FuturesDailyBar(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="新浪合约代码（RB0 / RB2701）")
+    underlying: Mapped[str | None] = mapped_column(String(8), nullable=True, index=True, comment="品种代码（从 symbol 提取，如 RB2701 → RB）")
     trade_date: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="交易日")
-    contract_month: Mapped[date | None] = mapped_column(Date, nullable=True, index=True, comment="所属交割月份（取当月第一天，如 RB2701 → 2027-01-01；连续合约/老式3位代码为 NULL）")
+    contract_month: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, comment="所属交割月份（1~12，如 RB2701 → 1；连续合约/老式3位代码为 NULL）")
     open: Mapped[float] = mapped_column("open_price", Float, nullable=True, comment="开盘价")
     high: Mapped[float] = mapped_column(Float, nullable=True, comment="最高价")
     low: Mapped[float] = mapped_column(Float, nullable=True, comment="最低价")

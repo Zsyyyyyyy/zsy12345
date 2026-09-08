@@ -6,9 +6,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.database import Base, engine
 from app.routers.auth import router as auth_router
-from app.routers.history import router as history_router
+from app.routers.futures_catalog_router import router as futures_catalog_router
+from app.routers.futures_history_router import router as futures_history_router
 from app.routers.positions import router as positions_router
-from app.routers.realtime import router as realtime_router
+from app.routers.quotes_router import router as quotes_router
 from app.routers.settlements import router as settlements_router
 from app.routers.watchlist import router as watchlist_router
 
@@ -49,11 +50,14 @@ def futures_page():
 app.include_router(auth_router)
 
 # ① 实时行情接口（网页抓取新浪）：/api/futures、suggest、minline、dailykline
-app.include_router(realtime_router)
+app.include_router(quotes_router)
 
-# ② 历史行情 + 品种信息接口（读数据库，数据由脚本 refresh_tradable_futures.py 定时刷新）：
-#    /api/futures-base*、/api/futures/hist-position、/api/history/dailybars
-app.include_router(history_router)
+# ② 历史行情接口（读数据库，缺失日K时通过新浪客户端按需回填）：
+#    /api/futures/hist-position、/api/history/dailybars
+app.include_router(futures_history_router)
+
+# ③ 期货合约目录接口（数据由 refresh_tradable_futures.py 定时刷新）
+app.include_router(futures_catalog_router)
 
 # 持仓 CRUD 接口：/api/positions
 app.include_router(positions_router)

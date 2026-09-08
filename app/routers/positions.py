@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import Position, User
-from app.routers.history import validate_position_code, auto_fill_multiplier
+from app.utils.contract_codes_utils import validate_position_code, auto_fill_multiplier
 from app.schemas import PositionCreate, PositionUpdate, PositionOut
 
 router = APIRouter(tags=["positions"])
@@ -52,13 +52,13 @@ def create_position(
     （由 validate_position_code 按 symbol 日期规则判断，不再查表）。
     自动补乘数：若请求未传，按品种乘数字典自动取 multiplier。
     """
-    ok, err = validate_position_code(data.code, db)
+    ok, err = validate_position_code(data.code)
     if not ok:
         raise HTTPException(status_code=400, detail=err)
 
     multiplier = data.multiplier
     if multiplier is None:
-        multiplier = auto_fill_multiplier(data.code, db)
+        multiplier = auto_fill_multiplier(data.code)
 
     pos = Position(
         user_id=user.id,
@@ -103,7 +103,7 @@ def update_position(
 
     # code 改了：先校验，校验通过后再写
     if 'code' in updates and updates['code'] != pos.code:
-        ok, err = validate_position_code(updates['code'], db)
+        ok, err = validate_position_code(updates['code'])
         if not ok:
             raise HTTPException(status_code=400, detail=err)
 

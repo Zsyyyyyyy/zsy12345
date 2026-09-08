@@ -40,7 +40,7 @@
   }
   /* 终端外壳（仿首页 index.html） */
   .terminal {
-    width: 1440px; max-width: 100%;
+    width: 1680px; max-width: 100%;
     background: var(--bg);
     border-radius: 10px; border: 1px solid #262626;
     overflow: hidden;
@@ -126,12 +126,19 @@
      # 居中；名称(2)/代码(3) 表头与内容一起左对齐；其余数字列右对齐 */
   .quote-table { table-layout: fixed; }
   .quote-table thead th:nth-child(1) { width: 36px; }
-  .quote-table thead th:nth-child(2) { width: 22%; }
-  .quote-table thead th:nth-child(3) { width: 15%; }
+  .quote-table thead th:nth-child(2) { width: 19%; }
+  .quote-table thead th:nth-child(3) { width: 13%; }
+  .quote-table thead th:nth-child(4), .quote-table thead th:nth-child(5),
+  .quote-table thead th:nth-child(6) { width: 10%; }
+  .quote-table thead th:nth-child(7), .quote-table thead th:nth-child(8) { width: 11%; }
+  .quote-table thead th:nth-child(9) { width: 96px; }
   .quote-table thead th:last-child { width: 7%; }
   .quote-table th:nth-child(2), .quote-table td:nth-child(2),
   .quote-table th:nth-child(3), .quote-table td:nth-child(3) { text-align: left; }
   .quote-table th, .quote-table td { overflow: hidden; text-overflow: ellipsis; }
+  .quote-table th:nth-child(9), .quote-table td:nth-child(9) {
+    width: 96px; overflow: visible; text-overflow: clip;
+  }
   .quote-table th:last-child, .quote-table td:last-child { overflow: visible; }
   /* 序号列：固定 36px 足够显示两位序号且不截断 */
   .quote-table th:nth-child(1), .quote-table td:nth-child(1) { padding-left: 4px; padding-right: 4px; overflow: visible; }
@@ -687,7 +694,7 @@
       const table = document.createElement('table');
       table.className = 'quote-table';
       table.innerHTML =
-        '<thead><tr><th class="num">#</th><th>名称</th><th>代码</th><th>现价</th><th>涨跌</th><th>涨跌幅</th>' +
+        '<thead><tr><th class="num">#</th><th>名称</th><th>代码</th><th>现价</th><th>当日最高</th><th>当日最低</th><th>涨跌</th><th>涨跌幅</th>' +
         '<th>时间</th><th></th></tr></thead><tbody></tbody>';
       const tbody = table.querySelector('tbody');
       g.codes.forEach((code, idx) => {
@@ -697,7 +704,7 @@
         if (pos) tr.className = 'has-pos';
         if (!d) {
           tr.innerHTML = `<td class="flat num">${idx + 1}</td>` + nameCell(d, code, pos) +
-            `<td class="code">${fmtCode(code)}</td><td colspan="4" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
+            `<td class="code">${fmtCode(code)}</td><td colspan="6" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
           tr.querySelector('.del').addEventListener('click', () => removeCode(code));
         } else {
           const price = Number(d.price), yest = Number(d.yestclose);
@@ -713,6 +720,8 @@
             nameCell(d, code, pos) +
             `<td class="code">${fmtCode(code)}</td>` +
             `<td class="${cls}">${fmtNum(price)}</td>` +
+            `<td>${fmtNum(d.high)}</td>` +
+            `<td>${fmtNum(d.low)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(updown, 2)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(pct, 2)}%</td>` +
             `<td class="flat">${fmtTime(d.time)}</td>` +

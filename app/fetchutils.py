@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-fetchutils.py —— 抓数公共底层（非接口文件，realtime/history/维护脚本共用）
-
-新浪 HTTP 工具 + JSONP 剥壳 + 品种/合约常量与乘数字典 + 日K URL。
-"""
+"""外部数据访问的底层 HTTP、JSONP 工具和期货常量。"""
 import json
 import re
 import socket
@@ -38,11 +34,6 @@ def http_get(url: str, enc: str = 'utf-8', timeout: int = TIMEOUT) -> str:
     except Exception as e:
         raise HTTPException(status_code=502, detail='代理请求失败: ' + str(e))
     return buf.decode(enc, errors='replace')
-
-
-def sina_get(host: str, path: str, enc: str = 'gb18030') -> str:
-    """转发新浪 https 接口（hq.sinajs.cn 等）。新浪默认 GB18030 编码。"""
-    return http_get('https://' + host + path, enc=enc)
 
 
 # JSONP `var xxx=<payload>;` —— 服务端剥壳，转纯 JSON 数组/对象
@@ -86,10 +77,6 @@ EXCHANGE_MAP = {
     'cffex': 'CFFEX', # 中国金融期货交易所（股指/国债）
     'gfex': 'GFEX',   # 广州期货交易所
 }
-
-NODE_LIST_URL = 'http://vip.stock.finance.sina.com.cn/quotes_service/view/js/qihuohangqing.js'
-CONTRACT_URL = ('https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/'
-                'Market_Center.getHQFuturesData?page=1&sort=position&asc=0&node={node}&base=futures')
 
 # 品种乘数字典：underlying -> (multiplier, tick_size)
 # 每点价值（合约乘数，元/点）。新品种（铂/钯）暂 None，前端可手动补。
@@ -192,9 +179,5 @@ _CONTRACT_RE = re.compile(r'^([A-Za-z]+)(\d{4})$')
 
 
 
-KLINE_URL = ('https://stock2.finance.sina.com.cn/futures/api/jsonp.php/'
-             'var%20t=/InnerFuturesNewService.getDailyKLine?symbol={symbol}')
 BATCH_SIZE = 500  # 每批 upsert 行数
-
-
 

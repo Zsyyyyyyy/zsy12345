@@ -5,7 +5,7 @@ fetch_daily_history.py —— 批量拉取期货历史日K行情，写入 future
 
 对关注品种清单（DEFAULT_UNDERLYINGS，见下）逐月拼合约 symbol（如 RB2001），
 问新浪日K接口，解析 OHLCV，按 (symbol, trade_date) 幂等 upsert 到 futures_daily_bars。
-解析/入库复用 app/services/futures_history.py，
+解析/入库复用 app/services/futures_history_service.py，
 与 /api/futures/hist-position 的按需回填共用同一份逻辑（字段/口径一致）。
 
 用法（在项目根目录）：

@@ -3,7 +3,7 @@
 """
 refresh_tradable_futures.py —— 定时刷新 futures_base 合约库（薄壳脚本，文件名沿用历史命名）
 
-抓取逻辑收拢在 app/services/futures_catalog.py 的 refresh_contracts()。
+抓取逻辑收拢在 app/services/futures_catalog_service.py 的 refresh_contracts()。
 本脚本只负责命令行入口 + 数据库会话 + 输出格式，供 cron 每日调用。
 
 refresh_contracts 语义（只加不删，无 is_active）：

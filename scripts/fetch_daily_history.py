@@ -5,7 +5,7 @@ fetch_daily_history.py —— 批量拉取期货历史日K行情，写入 future
 
 对关注品种清单（DEFAULT_UNDERLYINGS，见下）逐月拼合约 symbol（如 RB2001），
 问新浪日K接口，解析 OHLCV，按 (symbol, trade_date) 幂等 upsert 到 futures_daily_bars。
-解析/入库复用 app/routers/history.py 的 _parse_kline_rows / _upsert_daily_bars，
+解析/入库复用 app/services/futures_history.py，
 与 /api/futures/hist-position 的按需回填共用同一份逻辑（字段/口径一致）。
 
 用法（在项目根目录）：
@@ -27,7 +27,6 @@ import argparse
 import json
 import sys
 import time
-import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
@@ -38,8 +37,8 @@ from sqlalchemy import select
 
 from app.core.database import Base, engine, SessionLocal
 from app.models import FuturesDailyBar
-from app.fetchutils import KLINE_URL, http_get, parse_jsonp
-from app.routers.history import _parse_kline_rows, _upsert_daily_bars
+from app.clients.sina_client import get_daily_kline
+from app.services.futures_history_service import parse_kline_rows, upsert_daily_bars
 
 engine.echo = False  # 只在脚本进程内关闭 SQL 日志，避免逐合约刷屏（不影响 app）
 
@@ -139,8 +138,7 @@ def fetch_underlying(underlying: str, since: date, until: date,
                     skipped += 1
                     continue
             try:
-                text = http_get(KLINE_URL.format(symbol=urllib.parse.quote(symbol)), enc='utf-8')
-                data = parse_jsonp(text)
+                data = get_daily_kline(symbol)
             except Exception as e:
                 errors += 1
                 if len(err_examples) < 5:
@@ -149,12 +147,12 @@ def fetch_underlying(underlying: str, since: date, until: date,
             if not isinstance(data, list) or not data:
                 empty += 1
                 continue
-            rows = _parse_kline_rows(symbol, data)
+            rows = parse_kline_rows(symbol, data)
             if not rows:
                 empty += 1
                 continue
             contracts += 1
-            rows_total += _upsert_daily_bars(db, rows, dry_run)
+            rows_total += upsert_daily_bars(db, rows, dry_run)
         return {
             'underlying': underlying,
             'contracts': contracts, 'rows': rows_total,

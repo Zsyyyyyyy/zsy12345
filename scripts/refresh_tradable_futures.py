@@ -3,7 +3,7 @@
 """
 refresh_tradable_futures.py —— 定时刷新 futures_base 合约库（薄壳脚本，文件名沿用历史命名）
 
-抓取逻辑收拢在 app/routers/history.py 的 refresh_contracts()（与旧版共用同一份新浪抓取代码）。
+抓取逻辑收拢在 app/services/futures_catalog.py 的 refresh_contracts()。
 本脚本只负责命令行入口 + 数据库会话 + 输出格式，供 cron 每日调用。
 
 refresh_contracts 语义（只加不删，无 is_active）：
@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # 项目根目录（app 包所在）
 
 from app.core.database import Base, engine, SessionLocal
-from app.routers.history import refresh_contracts
+from app.services.futures_catalog_service import refresh_contracts
 
 engine.echo = False  # 关闭脚本进程内 SQL 日志，避免刷屏（不影响 app）
 

@@ -26,7 +26,7 @@ class FuturesBase(Base):
 
     是否「当前可交易」不再用列维护，由调用方按 symbol 交割年月判断：
     交割月 >= 当前月 即可交易（如 2027-02 时 RB2701 到期、01 合约轮到 RB2801）。
-    持仓接口据此只做格式+日期校验（见 app/routers/history.py validate_position_code），
+    持仓接口据此只做格式+日期校验（见 app/utils/contract_codes.py），
     不再命中本表；本表只服务于持仓代码联想 /api/futures-base/search（过滤已到期）
     与品种字典展示。海外期货/港股/A股 已下线，不纳入持仓。
 

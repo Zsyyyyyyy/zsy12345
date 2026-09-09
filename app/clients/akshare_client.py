@@ -40,6 +40,9 @@ _CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 # 新浪防盗链：不带 Referer 直接 403 Forbidden（服务器上必现，本地家宽同样 403）。
 # akshare 内部是裸 requests.get，没机会带 Referer，只能在这里全进程注入。
 _SINA_REFERER = "https://finance.sina.com.cn/"
+# requests 默认无超时：akshare 内部是裸 requests.get(url)，一旦对端不响应就永久挂起
+# （实测刷新脚本会卡死在第一个不响应的品种上），故全局兜一个超时。
+_HTTP_TIMEOUT = 15
 
 try:
     import requests.sessions as _sessions
@@ -60,6 +63,8 @@ try:
             headers.setdefault("Referer", _SINA_REFERER)
             headers.setdefault("Accept-Language", "zh-CN,zh;q=0.9")
             kwargs["headers"] = headers
+        if not kwargs.get("timeout"):
+            kwargs["timeout"] = _HTTP_TIMEOUT
         return _orig_session_request(self, method, url, *args, **kwargs)
 
     _sessions.Session.request = _session_request
@@ -396,3 +401,56 @@ def diagnose(codes: list[str]) -> dict:
 def _node_of(prod: str) -> str | None:
     """诊断用：拿 node，不抛异常。"""
     return _VARIETY_NODE.get(prod.upper())
+
+
+# ---------------------------------------------------------------- 合约目录
+# 供 app/services/futures_catalog_service.py 刷新 futures_base 用。
+# 原先这里解析新浪 qihuohangqing.js 文本、按 node 拼 URL；akshare 有现成的
+# futures_symbol_mark / futures_zh_realtime，含义完全等价，且 Referer 补丁在这里已生效。
+
+_EXCHANGE_CN2CODE = {
+    "郑州商品交易所": "CZCE",
+    "大连商品交易所": "DCE",
+    "上海期货交易所": "SHFE",
+    "中国金融期货交易所": "CFFEX",
+    "广州期货交易所": "GFEX",
+}
+
+
+def fetch_varieties() -> list[dict]:
+    """当前全部可交易品种：ak.futures_symbol_mark()。
+
+    返回 [{"name": 中文品种名(如 纯碱), "node": 新浪 node(如 cj_qh),
+           "exchange": CZCE/DCE/... , "ak_symbol": akshare 品种名(同 name)}]
+    取不到抛异常，由调用方计入 failed。
+    """
+    import akshare as ak
+    df = _retry(lambda: ak.futures_symbol_mark())
+    if df is None or df.empty:
+        raise RuntimeError("ak.futures_symbol_mark() 返回空表")
+    out = []
+    for _, r in df.iterrows():
+        name = _s(r.get("symbol"))
+        node = _s(r.get("mark"))
+        if not name or not node:
+            continue
+        out.append({
+            "name": name,
+            "node": node,
+            "exchange": _EXCHANGE_CN2CODE.get(_s(r.get("exchange")), ""),
+            "ak_symbol": name,
+        })
+    return out
+
+
+def fetch_contracts(ak_symbol: str) -> list[dict]:
+    """某品种当前挂牌的全部合约：ak.futures_zh_realtime(symbol=中文品种名)。
+
+    返回 [{"symbol": "SA2701", "name": "纯碱2701"}]（含 XX0 连续行，由调用方跳过）。
+    """
+    import akshare as ak
+    df = _retry(lambda: ak.futures_zh_realtime(symbol=ak_symbol), times=2)
+    if df is None or df.empty:
+        return []
+    return [{"symbol": _s(r.get("symbol")).upper(), "name": _s(r.get("name"))}
+            for _, r in df.iterrows()]

@@ -13,10 +13,9 @@ REFERER = 'http://finance.sina.com.cn/'
 TIMEOUT = 15     # 单次请求超时（秒）
 SLEEP = 0.3      # 批量抓取请求间隔，避免新浪封 IP
 
-# =====================================================================
-# 一、HTTP 工具（公共：三处旧代码各写一遍的 urlopen/UA/Referer 收拢于此）
-# =====================================================================
-
+# 强制直连：行情源全是国内站点，环境/系统代理（V2Ray/Clash 等）只会导致
+# ProxyError/RemoteDisconnected，永远不该走代理。
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def http_get(url: str, enc: str = 'utf-8', timeout: int = TIMEOUT) -> str:
@@ -27,7 +26,7 @@ def http_get(url: str, enc: str = 'utf-8', timeout: int = TIMEOUT) -> str:
         'Accept': '*/*',
     })
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _OPENER.open(req, timeout=timeout) as resp:
             buf = resp.read()
     except socket.timeout:
         raise HTTPException(status_code=504, detail='请求超时')

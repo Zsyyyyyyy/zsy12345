@@ -1,4 +1,7 @@
-"""实时行情 HTTP 接口；新浪协议细节统一由 clients.sina_client 处理。"""
+"""实时行情 HTTP 接口；/api/futures 实时行情走 akshare（只处理国内期货 nf_ 代码）。
+
+K线/分钟线/联想仍走新浪 stock2 域（与被封的 hq.sinajs.cn 不是同一个域）。
+"""
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,10 +9,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.clients.akshare_client import get_quotes
 from app.clients.sina_client import (
     get_daily_kline,
     get_minute_line,
-    get_quotes,
     search_symbols,
 )
 from app.core.database import get_db

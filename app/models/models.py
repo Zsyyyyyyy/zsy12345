@@ -46,6 +46,15 @@ class FuturesBase(Base):
     exchange: Mapped[str] = mapped_column(String(8), nullable=False, comment="交易所 SHFE/DCE/CZCE/CFFEX/GFEX")
     multiplier: Mapped[float | None] = mapped_column(Float, nullable=True, comment="合约乘数（每点价值，元；新品种可能为空）")
     tick_size: Mapped[float | None] = mapped_column(Float, nullable=True, comment="最小变动价位")
+    exchange_margin_rate: Mapped[float | None] = mapped_column(
+        Float, nullable=True, comment="交易所最低保证金比例（小数，如 0.08=8%；来源为空时不猜测）"
+    )
+    margin_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, comment="交易所保证金比例来源更新时间"
+    )
+    margin_source: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, comment="保证金数据来源"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间"

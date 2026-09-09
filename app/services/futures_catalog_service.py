@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.clients.sina_client import get_contracts, get_node_list_text
+from app.clients.exchange_rules_client import get_contract_margin_rates
 from app.fetchutils import EXCHANGE_MAP, MULTIPLIERS, SLEEP, _CONTRACT_RE
 from app.models import FuturesBase
 
@@ -115,6 +116,7 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
                 unchanged += 1
         time.sleep(SLEEP)
 
+    margin_result = refresh_margin_rates(db, dry_run=dry_run, log=log)
     if not dry_run:
         db.commit()
     total = len(db.scalars(select(FuturesBase)).all())
@@ -129,4 +131,37 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
         "dry_run": dry_run, "nodes": len(nodes), "inserted": inserted,
         "updated": updated, "unchanged": unchanged, "skipped": skipped,
         "failed": failed, "total": total,
+        "margins": margin_result,
     }
+
+
+def refresh_margin_rates(db: Session, dry_run: bool = False, log=None) -> dict:
+    """刷新当前挂牌合约的最低交易所保证金比例。
+
+    外部规则抓取失败时保留库内旧值，不能用空值覆盖最后一次有效数据。
+    """
+    try:
+        rules = get_contract_margin_rates()
+    except Exception as exc:
+        if log is not None:
+            log(f"⚠ 保证金比例刷新失败，保留原数据：{exc}")
+        return {"updated": 0, "matched": 0, "failed": True, "detail": str(exc)}
+
+    rows = db.scalars(select(FuturesBase).where(FuturesBase.symbol.in_(rules))).all()
+    updated = 0
+    for row in rows:
+        rule = rules[row.symbol]
+        changed = (
+            row.exchange_margin_rate != rule["rate"]
+            or row.margin_updated_at != rule["updated_at"]
+            or row.margin_source != rule["source"]
+        )
+        if changed:
+            updated += 1
+            if not dry_run:
+                row.exchange_margin_rate = rule["rate"]
+                row.margin_updated_at = rule["updated_at"]
+                row.margin_source = rule["source"]
+    if log is not None:
+        log(f"保证金规则 {len(rules)} 条 / 匹配合约 {len(rows)} 条 / 更新 {updated} 条")
+    return {"updated": updated, "matched": len(rows), "received": len(rules), "failed": False}

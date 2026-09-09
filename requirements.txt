@@ -7,3 +7,4 @@ bcrypt
 PyJWT
 email-validator
 python-dotenv
+akshare

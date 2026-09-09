@@ -131,6 +131,9 @@ class FuturesBaseOut(BaseModel):
     exchange: str             # SHFE/DCE/CZCE/CFFEX/GFEX
     multiplier: Optional[float]   # 每点价值
     tick_size: Optional[float]    # 最小变动价位
+    exchange_margin_rate: Optional[float]  # 交易所最低保证金比例（小数，如 0.07=7%）
+    margin_updated_at: Optional[datetime]
+    margin_source: Optional[str]
 
     class Config:
         from_attributes = True

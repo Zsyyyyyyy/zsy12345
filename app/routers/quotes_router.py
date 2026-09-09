@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clients.akshare_client import get_quotes
+from app.clients.akshare_client import diagnose, get_quotes
 from app.clients.sina_client import (
     get_daily_kline,
     get_minute_line,
@@ -53,6 +53,12 @@ def futures(codes: str = ""):
     if not codes:
         raise HTTPException(status_code=400, detail="缺少 codes 参数")
     return JSONResponse({"items": get_quotes(codes.split(","))})
+
+
+@router.get("/api/futures/diag")
+def futures_diag(codes: str = "nf_SA2701"):
+    """行情链路自诊断：逐层探测 akshare/品种表/实时接口，返回 JSON 报告（排障用）。"""
+    return JSONResponse(diagnose([c.strip() for c in codes.split(",") if c.strip()]))
 
 
 @router.get("/api/futures/suggest")

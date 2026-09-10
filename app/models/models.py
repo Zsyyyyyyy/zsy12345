@@ -21,7 +21,7 @@ class User(Base):
 class FuturesBase(Base):
     """国内期货「合约库」：当前挂牌 + 历史到期合约（全局共享，按完整合约主键）。
 
-    只增不改删：refresh_tradable_futures.py（定时）把新浪当前挂牌的新合约补进来
+    只增不改删：refresh_futures_base.py（定时）把当前挂牌的新合约补进来
     （幂等 upsert）；入库过的合约（含到期后不再挂牌的）永不删除、也没有状态位。
 
     是否「当前可交易」不再用列维护，由调用方按 symbol 交割年月判断：

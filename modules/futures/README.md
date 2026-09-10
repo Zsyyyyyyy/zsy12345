@@ -25,7 +25,7 @@
 ## 合约库 futures_base
 
 `futures_base` 表存的是**真实挂牌合约**（如 `nf_RB2701`，含到期历史合约），由
-`refresh_tradable_futures.py` 定时从新浪刷新（只增不删、无 is_active）：
+`refresh_futures_base.py` 定时从 akshare/新浪刷新（只增不删、无 is_active）：
 
 交易所最低保证金比例由 AkShare/九期网交易规则按合约刷新，存放在
 `exchange_margin_rate`（小数，如 `0.07` 表示 7%）。已有数据库首次升级先执行：
@@ -35,8 +35,12 @@ venv/bin/python scripts/migrate_futures_margin.py
 ```
 
 ```bash
-venv/bin/python refresh_tradable_futures.py            # 拉取 + upsert
-venv/bin/python refresh_tradable_futures.py --dry-run  # 只看不写
+venv/bin/python scripts/refresh_futures_base.py            # 拉取 + upsert
+venv/bin/python scripts/refresh_futures_base.py --dry-run  # 只看不写
+venv/bin/python scripts/refresh_futures_base.py --json     # JSON 输出，给 cron
+
+# 或用 HTTP 触发（不用登服务器）
+curl -X POST "http://127.0.0.1:8642/api/futures-base/refresh"
 ```
 
 「当前可交易」不再靠状态位，统一按 **symbol 交割年月 >= 当前月** 判断：

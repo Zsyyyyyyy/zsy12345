@@ -1,12 +1,14 @@
-"""新浪行情接口适配层。
+"""新浪行情接口适配层（K线/分钟线/联想/合约目录）。
+
+实时行情已迁移到 akshare（东财兜底），见 clients.akshare_client。
+注意：本模块请求的是 stock2/vip.stock.finance.sina.com.cn，
+与被机房 IP 封禁的 hq.sinajs.cn 不是同一个域；若服务器上
+minline/dailykline 也报错，再按同样思路切东财。
 
 项目其他模块只调用这里的业务方法，不直接感知新浪域名、路径、编码或 JSONP。
 """
 import json
-import re
 import urllib.parse
-
-from fastapi import HTTPException
 
 from app.fetchutils import http_get, parse_jsonp
 
@@ -24,60 +26,6 @@ KLINE_URL = (
     "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/"
     "var%20t=/InnerFuturesNewService.getDailyKLine?symbol={symbol}"
 )
-
-_HQ_LINE_RE = re.compile(r'var\s+hq_str_([A-Za-z0-9_$.]+?)="(.*?)"\s*;?', re.DOTALL)
-_INDEX_FUTURE_RE = re.compile(r"^nf_(IF|IH|IC|IM|TF|TS|T\d|TL)")
-
-
-def _parse_quote_item(code: str, fields: list[str]) -> dict | None:
-    if len(fields) < 2:
-        return None
-    if code.startswith("nf_"):
-        if _INDEX_FUTURE_RE.match(code):
-            return {
-                "code": code, "name": ((fields[49] if len(fields) > 49 else code) or code).replace('\"', ""),
-                "open": fields[0], "high": fields[1], "low": fields[2], "price": fields[3],
-                "yestclose": fields[13] if len(fields) > 13 else "",
-                "volume": fields[4] if len(fields) > 4 else "",
-                "time": fields[37] if len(fields) > 37 else "",
-            }
-        return {
-            "code": code, "name": fields[0],
-            "open": fields[2] if len(fields) > 2 else "",
-            "high": fields[3] if len(fields) > 3 else "",
-            "low": fields[4] if len(fields) > 4 else "",
-            "price": fields[8] if len(fields) > 8 else "",
-            "yestclose": fields[10] if len(fields) > 10 else "",
-            "volume": fields[14] if len(fields) > 14 else "",
-            "time": fields[1] if len(fields) > 1 else "",
-        }
-    if re.match(r"^(sh|sz|bj)\d", code):
-        return {
-            "code": code, "name": fields[0],
-            "open": fields[1] if len(fields) > 1 else "",
-            "yestclose": fields[2] if len(fields) > 2 else "",
-            "price": fields[3] if len(fields) > 3 else "",
-            "high": fields[4] if len(fields) > 4 else "",
-            "low": fields[5] if len(fields) > 5 else "",
-            "volume": fields[8] if len(fields) > 8 else "",
-            "time": fields[31] if len(fields) > 31 else "",
-        }
-    return None
-
-
-def get_quotes(codes: list[str]) -> list[dict]:
-    encoded = [urllib.parse.quote(code.strip()) for code in codes if code.strip()]
-    text = _sina_get("hq.sinajs.cn", "/list=" + ",".join(encoded))
-    if "FAILED" in text:
-        raise HTTPException(status_code=502, detail="新浪返回 FAILED")
-    result = []
-    for line in text.splitlines():
-        match = _HQ_LINE_RE.search(line)
-        if match:
-            item = _parse_quote_item(match.group(1), match.group(2).split(","))
-            if item is not None:
-                result.append(item)
-    return result
 
 
 def search_symbols(key: str, limit: int = 20) -> list[dict]:

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import FuturesBase
 from app.schemas import FuturesBaseOut
+from app.services.futures_catalog_service import refresh_contracts
 from app.utils.contract_codes_utils import is_live_symbol, validate_position_code
 
 router = APIRouter(tags=["futures-catalog"])
@@ -61,6 +62,22 @@ def get_futures_base(code: str, db: Session = Depends(get_db)):
     if item is None:
         raise HTTPException(status_code=404, detail="合约不存在")
     return item
+
+
+@router.post("/api/futures-base/refresh")
+def refresh_futures_base(
+    dry_run: bool = Query(False, description="true=只统计不写库"),
+    db: Session = Depends(get_db),
+):
+    """把当前挂牌合约补进 futures_base（akshare，幂等 upsert，只增不删）。
+
+    遍历全部品种逐个拉合约，约需 30~60 秒；返回结果与脚本一致
+    （inserted/updated/unchanged/skipped/failed/total）。
+    """
+    try:
+        return refresh_contracts(db, dry_run=dry_run)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"合约目录刷新失败: {exc}")
 
 
 @router.post("/api/futures-base/validate")

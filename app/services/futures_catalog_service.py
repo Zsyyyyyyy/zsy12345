@@ -5,39 +5,21 @@ import time
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clients.sina_client import get_contracts, get_node_list_text
+from app.clients.akshare_client import fetch_contracts, fetch_varieties
 from app.clients.exchange_rules_client import get_contract_margin_rates
-from app.fetchutils import EXCHANGE_MAP, MULTIPLIERS, SLEEP, _CONTRACT_RE
+from app.fetchutils import MULTIPLIERS, SLEEP, _CONTRACT_RE
 from app.models import FuturesBase
+
+_MAX_FAIL_STREAK = 5   # 连续这么多品种拉取失败就提前中止，避免全网不通时空跑
 
 
 def fetch_nodes() -> list[tuple[str, str, str]]:
-    """拉取品种 node 映射，返回 (中文名, node, exchange)。"""
-    source = get_node_list_text()
-    result: list[tuple[str, str, str]] = []
-    for exchange_key in ("czce", "dce", "shfe", "cffex", "gfex"):
-        start = source.find(exchange_key + " :")
-        if start < 0:
-            start = source.find(exchange_key + ":")
-        if start < 0:
-            continue
-        segment = source[start:]
-        segment = segment[segment.find("["):]
-        depth = 0
-        end = None
-        for index, char in enumerate(segment):
-            if char == "[":
-                depth += 1
-            elif char == "]":
-                depth -= 1
-                if depth == 0:
-                    end = index
-                    break
-        array = segment[:end + 1] if end is not None else segment
-        for name, node in re.findall(r"\['([^']+)',\s*'([^']+)'\s*,", array):
-            if node.endswith("_qh"):
-                result.append((name, node, EXCHANGE_MAP[exchange_key]))
-    return result
+    """拉取品种映射，返回 (中文品种名, akshare 品种名, 交易所代码)。
+
+    数据源是 akshare 的 futures_symbol_mark()（内部即新浪品种表），
+    不再手工解析 qihuohangqing.js 文本。
+    """
+    return [(v["name"], v["ak_symbol"], v["exchange"]) for v in fetch_varieties()]
 
 
 def _upsert_contract(
@@ -82,16 +64,24 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
             log(message)
 
     nodes = fetch_nodes()
-    say(f"品种 node 数：{len(nodes)}")
+    total_nodes = len(nodes)
+    say(f"品种数：{total_nodes}")
     inserted = updated = unchanged = skipped = failed = 0
+    streak = 0  # 连续失败计数：数据源整体不可达时没必要把 86 个品种全跑一遍
 
-    for underlying_name, node, exchange in nodes:
+    for index, (underlying_name, ak_symbol, exchange) in enumerate(nodes, 1):
         try:
-            contracts = get_contracts(node)
+            contracts = fetch_contracts(ak_symbol)
         except Exception as exc:
-            say(f"  ✗ {underlying_name:8} node={node:12} 拉取失败：{exc}")
             failed += 1
+            streak += 1
+            say(f"  ✗ [{index}/{total_nodes}] {underlying_name} 拉取失败：{exc}")
+            if streak >= _MAX_FAIL_STREAK:
+                say(f"连续 {streak} 个品种失败，判定数据源不可达，提前中止（已写入部分不回滚）")
+                break
             continue
+        streak = 0
+        say(f"  ✓ [{index}/{total_nodes}] {underlying_name:<8} 合约 {len(contracts)} 个")
 
         for contract in contracts:
             symbol = (contract.get("symbol") or "").upper()

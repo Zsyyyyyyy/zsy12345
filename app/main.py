@@ -56,7 +56,7 @@ app.include_router(quotes_router)
 #    /api/futures/hist-position、/api/history/dailybars
 app.include_router(futures_history_router)
 
-# ③ 期货合约目录接口（数据由 refresh_tradable_futures.py 定时刷新）
+# ③ 期货合约目录接口（数据由 refresh_futures_base.py 定时刷新）
 app.include_router(futures_catalog_router)
 
 # 持仓 CRUD 接口：/api/positions

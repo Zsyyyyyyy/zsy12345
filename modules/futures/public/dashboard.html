@@ -700,7 +700,7 @@
       const table = document.createElement('table');
       table.className = 'quote-table';
       table.innerHTML =
-        '<thead><tr><th class="num">#</th><th>名称</th><th>代码</th><th>现价</th><th>当日最高</th><th>当日最低</th><th>涨跌</th><th>涨跌幅</th>' +
+        '<thead><tr><th class="num">#</th><th>名称</th><th>代码</th><th>现价</th><th>当日最高</th><th>当日最低</th><th>涨跌幅</th>' +
         '<th>时间</th><th></th></tr></thead><tbody></tbody>';
       const tbody = table.querySelector('tbody');
       g.codes.forEach((code, idx) => {
@@ -710,7 +710,7 @@
         if (pos) tr.className = 'has-pos';
         if (!d) {
           tr.innerHTML = `<td class="flat num">${idx + 1}</td>` + nameCell(d, code, pos) +
-            `<td class="code">${fmtCode(code)}</td><td colspan="6" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
+            `<td class="code">${fmtCode(code)}</td><td colspan="5" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
           tr.querySelector('.del').addEventListener('click', () => removeCode(code));
         } else {
           const price = Number(d.price), yest = Number(d.yestclose);
@@ -728,7 +728,6 @@
             `<td class="${cls}">${fmtNum(price)}</td>` +
             `<td>${fmtNum(d.high)}</td>` +
             `<td>${fmtNum(d.low)}</td>` +
-            `<td class="${cls}">${sign}${fmtNum(updown, 2)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(pct, 2)}%</td>` +
             `<td class="flat">${fmtTime(d.time)}</td>` +
             `<td>${chartBtn}${delBtn}</td>`;

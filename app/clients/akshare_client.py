@@ -205,7 +205,7 @@ def _ak_futures_realtime(fut_codes: list[str]) -> tuple[list[dict], list[str]]:
                 "price": _s(r.get("trade")),
                 "yestclose": _s(r.get("presettlement") or r.get("prevsettlement") or r.get("preclose")),
                 "volume": _s(r.get("volume")),
-                "time": _s(r.get("time") or r.get("datetime")),
+                "time": _s(r.get("ticktime") or r.get("time") or r.get("datetime")),
             })
         return items, missed
 

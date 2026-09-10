@@ -106,6 +106,10 @@ def refresh_contracts(db: Session, dry_run: bool = False, log=None) -> dict:
                 unchanged += 1
         time.sleep(SLEEP)
 
+    # SessionLocal 使用 autoflush=False。空库重建时必须先把新增合约写入当前事务，
+    # 否则下面的保证金查询看不到刚 db.add() 的合约，导致首轮保证金全部为空。
+    if not dry_run:
+        db.flush()
     margin_result = refresh_margin_rates(db, dry_run=dry_run, log=log)
     if not dry_run:
         db.commit()

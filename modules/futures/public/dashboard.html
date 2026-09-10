@@ -156,8 +156,7 @@
   .quote-table th:nth-child(2), .quote-table td:nth-child(2) { padding-left: 14px; }
   /* 持仓表：名称列(2) 表头跟随内容左对齐 */
   .pos-table th:nth-child(2), .pos-table td:nth-child(2) { text-align: left; }
-  .name { color: var(--text); cursor: pointer; text-align: left; }
-  .name:hover { color: var(--accent); }
+  .name { color: var(--text); text-align: left; }
   td.num, th.num { text-align: center; }
   .code { color: var(--muted); font-size: 11px; }
   .up { color: var(--up); }
@@ -217,17 +216,13 @@
   .pos-form .row-btns .primary { color: var(--accent); border-color: var(--accent); }
   .pos-form .msg { color: var(--up); font-size: 11px; min-height: 14px; }
   .op.edit:hover { color: var(--accent); }
-  /* 走势图弹窗 */
+  /* 弹窗 */
   .mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
   .mask.show { display: flex; }
   .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: 760px; max-width: 95vw; }
   .modal-head { display: flex; align-items: center; margin-bottom: 8px; }
   .modal-head .t { font-size: 14px; font-weight: 500; color: var(--accent); }
-  .modal-head .sub { margin-left: 10px; color: var(--muted); font-size: 12px; }
   .modal-head .sp { flex: 1; }
-  .modal-head .tab-btn { border: 1px solid var(--border); background: none; color: var(--muted); font-size: 12px; border-radius: 4px; padding: 2px 10px; margin-left: 6px; cursor: pointer; }
-  .modal-head .tab-btn.active { color: var(--accent); border-color: var(--accent); }
-  .modal-head .tab-btn:hover { color: var(--accent); }
   .modal-head .close-btn { border: none; background: none; color: var(--muted); font-size: 18px; cursor: pointer; }
   .modal-head .close-btn:hover { color: var(--up); }
   canvas { width: 100%; height: auto; display: block; }
@@ -295,23 +290,9 @@
     <aside id="positions"></aside>
   </div>
 
-  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：新浪财经 · 涨红跌绿 · 国内期货可点名称看分时图 · 带 <span class="pos-tag" style="margin:0 2px">持</span> 标记且左侧有色条的行 = 你已持仓（悬浮看方向、开仓价与手数）</footer>
+  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：东方财富 · 涨红跌绿 · 带 <span class="pos-tag" style="margin:0 2px">持</span> 标记且左侧有色条的行 = 你已持仓（悬浮看方向、开仓价与手数）</footer>
   </div>
 </div>
-
-  <div class="mask" id="chartMask" data-page-node-id="gdtwTDxecJWSA11ewqjAVy">
-    <div class="modal" data-page-node-id="XABrQxVtR3cViDelkZIndc">
-      <div class="modal-head" data-page-node-id="8DXNgitJW9IkrROt3qBOCR">
-        <span class="t" id="chartTitle" data-page-node-id="YcHVKJGiCNhLAQ8ZKU86UC">--</span>
-        <span class="sub" id="chartSub" data-page-node-id="gVOc61wBTCEiuk8Z9AWFEl"></span>
-        <span class="sp" data-page-node-id="GSOHTBGaKSOWq38ZuGtXn7"></span>
-        <button class="tab-btn active" data-mode="min" data-page-node-id="vtrU9NZ560DLM9TOATsIIA">分时</button>
-        <button class="tab-btn" data-mode="day" data-page-node-id="f4oNRz6WjYLEbnkG4GOO7V">日K</button>
-        <button class="close-btn" id="chartClose" title="关闭" data-page-node-id="usynslTFQGtE8DzZAzAKQy">×</button>
-      </div>
-      <canvas id="chartCanvas" width="720" height="420" data-page-node-id="tfCt5cBCL6wPh2tCBz2E31"></canvas>
-    </div>
-  </div>
 
   <div class="mask" id="posMask">
     <div class="modal narrow">
@@ -414,11 +395,6 @@
   const searchInput = document.getElementById('searchInput');
   const addBtn = document.getElementById('addBtn');
   const suggestBox = document.getElementById('suggestBox');
-  const chartMask = document.getElementById('chartMask');
-  const chartCanvas = document.getElementById('chartCanvas');
-  const chartTitle = document.getElementById('chartTitle');
-  const chartSub = document.getElementById('chartSub');
-  const chartClose = document.getElementById('chartClose');
   const posMask = document.getElementById('posMask');
   const posTitle = document.getElementById('posTitle');
   const posCode = document.getElementById('posCode');
@@ -469,9 +445,6 @@
     applyGray(!gray);
     try { localStorage.setItem(THEME_KEY, gray ? '1' : '0'); } catch (e) { /* ignore */ }
   });
-  function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
   applyGray(gray);
 
   let timer = null;
@@ -681,12 +654,11 @@
     const lotsTxt = Number.isInteger(lots) ? String(lots) : String(lots);
     return '持仓 ' + dirLabel(dirOf(pos)) + ' ' + lotsTxt + ' 手 @' + Number(pos.buyPrice);
   }
-  // 名称单元格的标记与提示（持仓标签 + 分时图提示）
+  // 名称单元格的标记与提示（持仓标签）
   function nameCell(d, code, pos) {
     const tag = pos ? '<span class="pos-tag">持</span>' : '';
     const tips = [];
     if (pos) tips.push(posTip(pos));
-    if (d && code.startsWith('nf_')) tips.push('查看分时图');
     const title = tips.length ? ' title="' + tips.join(' · ') + '"' : '';
     return '<td class="name"' + title + '>' + (d ? d.name : '--') + tag + '</td>';
   }
@@ -721,8 +693,6 @@
           const pct = yest && yest !== 0 ? (updown / yest) * 100 : 0;
           const cls = updown > 0 ? 'up' : updown < 0 ? 'down' : 'flat';
           const sign = updown > 0 ? '+' : '';
-          const chartBtn = code.startsWith('nf_')
-            ? '<button class="op chart" title="分时图">▦</button>' : '';
           const delBtn = '<button class="op del" title="删除">×</button>';
           tr.innerHTML =
             `<td class="flat num">${idx + 1}</td>` +
@@ -733,12 +703,8 @@
             `<td>${fmtNum(d.low)}</td>` +
             `<td class="${cls}">${sign}${fmtNum(pct, 2)}%</td>` +
             `<td class="flat">${fmtTime(d.time)}</td>` +
-            `<td>${chartBtn}${delBtn}</td>`;
+            `<td>${delBtn}</td>`;
           tr.querySelector('.del').addEventListener('click', () => removeCode(code));
-          if (code.startsWith('nf_')) {
-            tr.querySelector('.name').addEventListener('click', () => showChart(code));
-            tr.querySelector('.chart').addEventListener('click', () => showChart(code));
-          }
         }
         tbody.appendChild(tr);
       });
@@ -1166,186 +1132,6 @@
   posLots.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posMult.focus(); });
   posMult.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') savePos(); });
 
-  // ===== 走势图（分时 / 日K）=====
-  let chartCode = null;
-  let chartMode = 'min';
-  const tabBtns = document.querySelectorAll('.tab-btn');
-
-  function showChart(code) {
-    chartCode = code;
-    const d = lastDataMap[code];
-    chartTitle.textContent = d ? d.name : code;
-    chartMask.classList.add('show');
-    setMode('min');
-  }
-  function setMode(mode) {
-    chartMode = mode;
-    tabBtns.forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
-    if (mode === 'min') loadMinLine(chartCode);
-    else loadDailyKLine(chartCode);
-  }
-  async function loadMinLine(code) {
-    const symbol = code.replace(/^nf_/, '');
-    chartSub.textContent = '';
-    try {
-      const resp = await fetch('/api/futures/minline?symbol=' + encodeURIComponent(symbol));
-      const json = await resp.json();
-      const data = json.data;
-      if (!Array.isArray(data) || data.length === 0) { chartSub.textContent = '无分时数据'; return; }
-      const yestclose = data.length && data[0].length > 5 ? Number(data[0][5]) : 0;
-      drawMinLine(chartCanvas, data, yestclose);
-      chartSub.textContent = symbol + (yestclose ? ' · 昨结 ' + fmtNum(yestclose) : '');
-    } catch (e) {
-      chartSub.textContent = '加载失败';
-    }
-  }
-  async function loadDailyKLine(code) {
-    const symbol = code.replace(/^nf_/, '');
-    chartSub.textContent = '';
-    try {
-      const resp = await fetch('/api/futures/dailykline?symbol=' + encodeURIComponent(symbol));
-      const json = await resp.json();
-      const data = json.data;
-      if (!Array.isArray(data) || data.length === 0) { chartSub.textContent = '无日K数据'; return; }
-      drawDailyKLine(chartCanvas, data, symbol);
-    } catch (e) {
-      chartSub.textContent = '加载失败';
-    }
-  }
-  function drawMinLine(canvas, data, yestclose) {
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-    const n = data.length;
-    if (!n) return;
-    const padL = 56, padR = 16, padT = 18, padB = 22;
-    const volH = 76, gap = 22;
-    const priceH = H - padT - padB - volH - gap;
-    const plotW = W - padL - padR;
-
-    const prices = data.map((r) => Number(r[1]));
-    const avgs = data.map((r) => Number(r[2]));
-    const vols = data.map((r) => Number(r[3] || 0));
-    let minP = Math.min(...prices, yestclose || Infinity);
-    let maxP = Math.max(...prices, yestclose || -Infinity);
-    avgs.forEach((v) => { if (v > 0) { minP = Math.min(minP, v); maxP = Math.max(maxP, v); } });
-    const pad = (maxP - minP) * 0.08 || 1;
-    minP -= pad; maxP += pad;
-    const maxVol = Math.max(...vols, 1);
-
-    const x = (i) => padL + (n === 1 ? 0 : (i / (n - 1)) * plotW);
-    const yP = (v) => padT + ((maxP - v) / (maxP - minP)) * priceH;
-    const volTop = padT + priceH + gap;
-    const yV = (v) => volTop + volH - (v / maxVol) * volH;
-
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.font = '10px monospace';
-    const gridN = 4;
-    for (let i = 0; i <= gridN; i++) {
-      const v = minP + ((maxP - minP) / gridN) * i;
-      const y = yP(v);
-      ctx.strokeStyle = cssVar('--grid'); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-      ctx.fillStyle = cssVar('--muted');
-      ctx.fillText(v.toFixed(1), padL - 4, y);
-    }
-    if (yestclose) {
-      ctx.strokeStyle = cssVar('--muted'); ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(padL, yP(yestclose)); ctx.lineTo(W - padR, yP(yestclose)); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    for (let i = 0; i < n; i++) {
-      const prev = i > 0 ? prices[i - 1] : yestclose;
-      ctx.fillStyle = prices[i] >= prev ? 'rgba(255,92,92,0.55)' : 'rgba(46,194,126,0.55)';
-      const bw = Math.max(1, plotW / n - 0.5);
-      ctx.fillRect(x(i) - bw / 2, yV(vols[i]), bw, volTop + volH - yV(vols[i]));
-    }
-    const last = prices[n - 1];
-    const lineColor = last >= yestclose ? '#ff5c5c' : '#2ec27e';
-    drawLine(ctx, data.map((r, i) => [x(i), yP(Number(r[1]))]), lineColor, 1.5);
-    drawLine(ctx, data.map((r, i) => [x(i), Number(r[2]) > 0 ? yP(Number(r[2])) : null]).filter((p) => p[1] !== null), '#f0b90b', 1);
-
-    ctx.fillStyle = cssVar('--muted');
-    ctx.textAlign = 'center';
-    const times = data.map((r) => r[0]);
-    [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1].forEach((i) => {
-      if (times[i]) ctx.fillText(times[i], x(i), H - 8);
-    });
-    ctx.textAlign = 'left';
-    ctx.fillStyle = lineColor; ctx.fillText('价格', padL + 4, padT - 4);
-    ctx.fillStyle = '#f0b90b'; ctx.fillText('均价', padL + 48, padT - 4);
-  }
-  function drawLine(ctx, pts, color, w) {
-    if (!pts.length) return;
-    ctx.strokeStyle = color; ctx.lineWidth = w;
-    ctx.beginPath();
-    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
-    ctx.stroke();
-  }
-  function drawDailyKLine(canvas, data, symbol) {
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-    const N = 120;
-    const rows = data.slice(-N);
-    const n = rows.length;
-    if (!n) return;
-    const padL = 56, padR = 16, padT = 18, padB = 22;
-    const volH = 76, gap = 22;
-    const priceH = H - padT - padB - volH - gap;
-    const plotW = W - padL - padR;
-
-    const opens = rows.map((r) => +r.o), closes = rows.map((r) => +r.c);
-    const highs = rows.map((r) => +r.h), lows = rows.map((r) => +r.l);
-    const vols = rows.map((r) => +r.v);
-    const minP = Math.min(...lows), maxP = Math.max(...highs);
-    const pad = (maxP - minP) * 0.05 || 1;
-    const lo = minP - pad, hi = maxP + pad;
-    const maxVol = Math.max(...vols, 1);
-
-    const yP = (v) => padT + ((hi - v) / (hi - lo)) * priceH;
-    const volTop = padT + priceH + gap;
-    const yV = (v) => volTop + volH - (v / maxVol) * volH;
-
-    ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.font = '10px monospace';
-    const gridN = 4;
-    for (let i = 0; i <= gridN; i++) {
-      const v = lo + ((hi - lo) / gridN) * i;
-      const y = yP(v);
-      ctx.strokeStyle = cssVar('--grid'); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-      ctx.fillStyle = cssVar('--muted'); ctx.fillText(v.toFixed(1), padL - 4, y);
-    }
-
-    const cw = plotW / n;
-    const bw = Math.max(1, cw * 0.7);
-    for (let i = 0; i < n; i++) {
-      const cx = padL + i * cw + cw / 2;
-      const up = closes[i] >= opens[i];
-      const color = up ? '#ff5c5c' : '#2ec27e';
-      ctx.fillStyle = up ? 'rgba(255,92,92,0.5)' : 'rgba(46,194,126,0.5)';
-      ctx.fillRect(cx - bw / 2, yV(vols[i]), bw, volTop + volH - yV(vols[i]));
-      ctx.strokeStyle = color; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(cx, yP(highs[i])); ctx.lineTo(cx, yP(lows[i])); ctx.stroke();
-      const yo = yP(opens[i]), yc = yP(closes[i]);
-      ctx.fillStyle = color;
-      ctx.fillRect(cx - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yo - yc)));
-    }
-
-    ctx.fillStyle = cssVar('--muted'); ctx.textAlign = 'center';
-    const dates = rows.map((r) => r.d);
-    [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1].forEach((i) => {
-      const cx = padL + i * cw + cw / 2;
-      if (dates[i]) ctx.fillText(dates[i].slice(5), cx, H - 8);
-    });
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ff5c5c'; ctx.fillText('阳线', padL + 4, padT - 4);
-    ctx.fillStyle = '#2ec27e'; ctx.fillText('阴线', padL + 48, padT - 4);
-    chartSub.textContent = symbol + ' · 最近 ' + n + ' 根日K';
-  }
-  function closeChart() { chartMask.classList.remove('show'); }
-
   // ===== 历史价格位置：当前价在历年同月合约合并区间里的位置 =====
   function hpCss() {
     if (document.getElementById('hpStyle')) return;
@@ -1395,7 +1181,7 @@
       }
       const s = j.stats;
       const years = (j.per_year || []).map((y) => `<div><b>${hpEsc(y.symbol)}</b>　${y.days}天　${f(y.min)} ~ ${f(y.max)}</div>`).join('');
-      const skip = (j.skipped_years && j.skipped_years.length) ? '<div class="hp-years">未纳入（新浪无更早数据）：' + hpEsc(j.skipped_years.join('、')) + '</div>' : '';
+      const skip = (j.skipped_years && j.skipped_years.length) ? '<div class="hp-years">未纳入（东财无更早数据）：' + hpEsc(j.skipped_years.join('、')) + '</div>' : '';
       const span = (s.max - s.min) > 0 ? Math.max(0, Math.min(100, (j.price - s.min) / (s.max - s.min) * 100)) : 50;
       panel.innerHTML =
         '<span class="hp-close">×</span>' +
@@ -1412,10 +1198,6 @@
       panel.querySelector('.hp-close').addEventListener('click', close);
     }
   }
-  chartClose.addEventListener('click', closeChart);
-  chartMask.addEventListener('click', (e) => { if (e.target === chartMask) closeChart(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChart(); });
-  tabBtns.forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
 
   // ===== 搜索联想 =====
   let suggestTimer = null;

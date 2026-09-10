@@ -2,9 +2,10 @@
 
 行情看板已整合进 FastAPI 主后端，不再是独立的 `web-futures` 服务。
 
-- 前端：`modules/futures/public/dashboard.html`
+- 前端：`modules/futures/public/dashboard.html`（**不含**分时/日K走势图，仅表格行情 + 持仓 + 历史价格位置）
+- 走势图接口（`minline` / `dailykline`）仍保留在服务端，前端不再调用
 - 入口路由：`GET /futures`（见 `app/main.py`）
-- 数据源：新浪行情接口（服务端代理，补 Referer + GB18030→UTF-8，返回结构化 JSON）
+- 数据源：东方财富行情接口（服务端代理，`no_proxy=*` + Chrome UA，返回结构化 JSON）
 
 ## 相关接口
 
@@ -25,7 +26,7 @@
 ## 合约库 futures_base
 
 `futures_base` 表存的是**真实挂牌合约**（如 `nf_RB2701`，含到期历史合约），由
-`refresh_futures_base.py` 定时从 akshare/新浪刷新（只增不删、无 is_active）：
+`refresh_futures_base.py` 定时从东方财富刷新（按交易所整市场拉取，只增不删、无 is_active）：
 
 交易所最低保证金比例由 AkShare/九期网交易规则按合约刷新，存放在
 `exchange_margin_rate`（小数，如 `0.07` 表示 7%）。已有数据库首次升级先执行：

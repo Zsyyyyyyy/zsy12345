@@ -1,7 +1,4 @@
-"""实时行情 HTTP 接口；/api/futures 实时行情走 akshare（只处理国内期货 nf_ 代码）。
-
-K线/分钟线/联想仍走新浪 stock2 域（与被封的 hq.sinajs.cn 不是同一个域）。
-"""
+"""实时行情 HTTP 接口；行情、K线、分时、联想全部走东方财富（只处理国内期货 nf_ 代码）。"""
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,16 +6,55 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clients.akshare_client import diagnose, get_quotes
-from app.clients.sina_client import (
+from app.clients.eastmoney_client import diagnose, get_quotes, num_str
+from app.clients.eastmoney_history_client import (
     get_daily_kline,
     get_minute_line,
     search_symbols,
 )
 from app.core.database import get_db
-from app.models import FuturesBase
+from app.models import FuturesBase, FuturesDailyBar
 
 router = APIRouter(tags=["quotes"])
+
+
+def _db_daily_rows(db: Session, symbol: str) -> list[dict]:
+    """从本地 futures_daily_bars 读日K，形状与东财客户端一致（[{d,o,h,l,c,v,p,s}]）。
+
+    用途：部分网络只放通东财延迟站（push2delay），而延迟站不提供日K，
+    此时退回本地库，避免日K图整块空白。库里没有就返回空列表。
+    """
+    prefix = re.match(r"^[A-Za-z]+", (symbol or "").strip())
+    if not prefix:
+        return []
+    want = prefix.group(0).upper()
+    stmt = (
+        select(FuturesDailyBar)
+        .where(FuturesDailyBar.symbol == (symbol or "").strip().upper())
+        .order_by(FuturesDailyBar.trade_date)
+    )
+    rows = db.scalars(stmt).all()
+    if not rows and want:
+        # 大小写/前缀不一致时再按品种兜底匹配一次（库里 symbol 统一大写）
+        stmt = (
+            select(FuturesDailyBar)
+            .where(FuturesDailyBar.underlying == want)
+            .order_by(FuturesDailyBar.trade_date)
+        )
+        rows = db.scalars(stmt).all()
+    return [
+        {
+            "d": r.trade_date.isoformat() if r.trade_date else "",
+            "o": num_str(r.open),
+            "h": num_str(r.high),
+            "l": num_str(r.low),
+            "c": num_str(r.close),
+            "v": num_str(r.volume),
+            "p": num_str(r.open_interest),
+            "s": num_str(r.settlement),
+        }
+        for r in rows
+    ]
 
 
 @router.get("/api/futures/margins")
@@ -57,7 +93,7 @@ def futures(codes: str = ""):
 
 @router.get("/api/futures/diag")
 def futures_diag(codes: str = "nf_SA2701"):
-    """行情链路自诊断：逐层探测 akshare/品种表/实时接口，返回 JSON 报告（排障用）。"""
+    """行情链路自诊断：逐层探测东财实时/合约/品种接口，返回 JSON 报告（排障用）。"""
     return JSONResponse(diagnose([c.strip() for c in codes.split(",") if c.strip()]))
 
 
@@ -76,7 +112,13 @@ def futures_minline(symbol: str = ""):
 
 
 @router.get("/api/futures/dailykline")
-def futures_dailykline(symbol: str = ""):
+def futures_dailykline(symbol: str = "", db: Session = Depends(get_db)):
     if not symbol:
         raise HTTPException(status_code=400, detail="缺少 symbol 参数")
-    return JSONResponse({"symbol": symbol, "data": get_daily_kline(symbol)})
+    data = get_daily_kline(symbol)
+    source = "eastmoney"
+    if not data:
+        # 上游日K主机不可达（只放通延迟站的网络）时退回本地库
+        data = _db_daily_rows(db, symbol)
+        source = "db"
+    return JSONResponse({"symbol": symbol, "source": source, "data": data})

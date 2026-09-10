@@ -123,9 +123,9 @@ class Settlement(Base):
 
 
 class FuturesDailyBar(Base):
-    """国内期货日级历史行情（新浪日K，由 fetch_daily_history.py 拉取）。
+    """国内期货日级历史行情（东方财富日K，由 fetch_daily_history.py 拉取）。
 
-    - symbol：新浪合约代码（具体合约如 RB2701），不带 nf_ 前缀
+    - symbol：合约代码（具体合约如 RB2701），不带 nf_ 前缀
     - 每行 = 某合约某个交易日的 OHLCV；contract_month 为该合约所属交割月份
     - (symbol, trade_date) 唯一，重复抓取按此键 upsert（幂等，可增量补数据）
     """

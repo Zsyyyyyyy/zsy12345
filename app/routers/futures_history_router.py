@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clients.sina_client import get_daily_kline
+from app.clients.eastmoney_history_client import get_daily_kline
 from app.core.database import get_db
 from app.models import FuturesDailyBar
 from app.services.futures_history_service import parse_kline_rows, upsert_daily_bars
@@ -14,8 +14,11 @@ router = APIRouter(tags=["futures-history"])
 _HIST_SINCE = 2019
 
 
-def _try_sina_daily_rows(canonical_symbol: str, quote_symbol: str) -> list[dict] | None:
-    data = get_daily_kline(quote_symbol)
+def _try_daily_rows(canonical_symbol: str, quote_symbol: str) -> list[dict] | None:
+    try:
+        data = get_daily_kline(quote_symbol)
+    except Exception:  # noqa: BLE001  取不到就交给下一个候选代码，不整单失败
+        return None
     if not isinstance(data, list) or not data:
         return None
     rows = parse_kline_rows(canonical_symbol, data)
@@ -23,7 +26,7 @@ def _try_sina_daily_rows(canonical_symbol: str, quote_symbol: str) -> list[dict]
 
 
 def _daily_rows_of_contract(db: Session, underlying: str, year: int, month: int):
-    """读取指定交割年月的日 K；数据库没有时从新浪回填。"""
+    """读取指定交割年月的日 K；数据库没有时从东财回填。"""
     symbol = f"{underlying}{year % 100:02d}{month:02d}"
     stmt = (
         select(FuturesDailyBar)
@@ -34,13 +37,8 @@ def _daily_rows_of_contract(db: Session, underlying: str, year: int, month: int)
     if rows:
         return rows
 
-    attempts = [symbol]
-    if year < 2021:
-        attempts.append(f"{underlying}{year % 10}{month:02d}")
-    for quote_symbol in attempts:
-        parsed = _try_sina_daily_rows(symbol, quote_symbol)
-        if not parsed:
-            continue
+    parsed = _try_daily_rows(symbol, symbol)
+    if parsed:
         upsert_daily_bars(db, parsed)
         return db.scalars(stmt).all()
     return []
@@ -62,7 +60,7 @@ def futures_hist_position(
     if price is None:
         own_rows = _daily_rows_of_contract(db, underlying, current_year, month)
         if not own_rows:
-            raise HTTPException(status_code=404, detail=f"{code} 暂无历史数据（可能新浪未收录）")
+            raise HTTPException(status_code=404, detail=f"{code} 暂无历史数据（可能东财未收录）")
         price = float(own_rows[-1].close)
         price_from = "self-last-close"
 
@@ -72,7 +70,7 @@ def futures_hist_position(
     for year in range(_HIST_SINCE, current_year):
         rows = _daily_rows_of_contract(db, underlying, year, month)
         if not rows:
-            skipped_years.append(f"{year}年{month:02d}月（新浪无数据）")
+            skipped_years.append(f"{year}年{month:02d}月（东财无数据）")
             continue
         closes = [float(row.close) for row in rows if row.close is not None]
         if not closes:
@@ -92,7 +90,7 @@ def futures_hist_position(
         return {
             "ok": False, "code": code, "underlying": underlying,
             "delivery_month": f"{current_year}-{month:02d}", "price": price,
-            "reason": "近 7 年无同月历史合约数据（新浪未收录更早）",
+            "reason": "近 7 年无同月历史合约数据（东财未收录更早）",
             "per_year": [], "skipped_years": skipped_years,
         }
 

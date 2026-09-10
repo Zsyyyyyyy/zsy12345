@@ -69,9 +69,9 @@ def refresh_futures_base(
     dry_run: bool = Query(False, description="true=只统计不写库"),
     db: Session = Depends(get_db),
 ):
-    """把当前挂牌合约补进 futures_base（akshare，幂等 upsert，只增不删）。
+    """把当前挂牌合约补进 futures_base（东财，幂等 upsert，只增不删）。
 
-    遍历全部品种逐个拉合约，约需 30~60 秒；返回结果与脚本一致
+    按交易所逐市场拉取合约（约 5~6 次请求）；返回结果与脚本一致
     （inserted/updated/unchanged/skipped/failed/total）。
     """
     try:

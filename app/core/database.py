@@ -11,9 +11,13 @@ DATABASE_URL = os.getenv(
     "mysql+pymysql://root:123456@127.0.0.1:3306/zsy12345",
 )
 
+# SQL 回显：沿用项目原有习惯默认开启；本机/服务器日志被 SQL 刷屏时可设 DB_ECHO=0 关掉，
+# 例如：DB_ECHO=0 venv/bin/python -m uvicorn app.main:app --port 8642
+DB_ECHO = os.getenv("DB_ECHO", "1").strip().lower() not in ("0", "false", "no", "off")
+
 engine = create_engine(
     DATABASE_URL,
-    echo=True,
+    echo=DB_ECHO,
     pool_pre_ping=True,
     # 强制每个连接使用北京时间（UTC+8），保证 func.now()/NOW() 落库时间与业务一致，
     # 不受服务器系统时区或 MySQL 全局 time_zone 影响。

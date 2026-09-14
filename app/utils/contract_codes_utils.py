@@ -47,7 +47,10 @@ def is_live_symbol(symbol: str) -> bool:
 def validate_position_code(code: str) -> tuple[bool, str | None]:
     c = (code or "").strip()
     if c.startswith("nf_"):
-        symbol = c[4:].upper()
+        # 注意：nf_ 是 3 个字符，取 symbol 必须 c[3:]。写成 c[4:] 会切掉品种首字母——
+        # 单字母品种（I/M/A/C/J/L/P/T/V/Y）直接被判「不是有效合约」，
+        # 双字母品种（RB/SA）侥幸通过但品种被截成最后一个字母（SA -> A），乘数会取错。
+        symbol = c.removeprefix("nf_").upper()
         match = _CONTRACT_RE.match(symbol)
         if not match:
             return False, f"「{c}」不是有效合约：应形如 nf_RB2701（品种 + 4 位交割年月）"
@@ -71,7 +74,7 @@ def auto_fill_multiplier(code: str) -> float | None:
     c = (code or "").strip()
     if not c.startswith("nf_"):
         return None
-    match = _CONTRACT_RE.match(c[4:].upper())
+    match = _CONTRACT_RE.match(c.removeprefix("nf_").upper())
     if not match:
         return None
     value = MULTIPLIERS.get(match.group(1))

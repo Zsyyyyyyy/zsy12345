@@ -120,9 +120,20 @@
   .suggest .item .nm { color: var(--text); }
   .suggest .item .cd { color: var(--muted); font-size: 11px; }
   .suggest .item .mk { margin-left: auto; font-size: 10px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted); }
+  /* 左右两个固定宽度的框：左「自选」（行情表）· 右「持仓」
+     终端内宽 1468px = 780 + 16(间距) + 672，窗口缩放时两边尺寸都不变 */
   .layout { display: flex; gap: 16px; align-items: flex-start; }
-  .layout > main { flex: 1 1 0; min-width: 0; }
-  .layout > aside { flex: 1 1 0; min-width: 0; }
+  .panel { flex: 0 0 auto; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .panel-left { width: 780px; }
+  .panel-right { width: 672px; }
+  .panel-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: #191919; border-bottom: 1px solid var(--border);
+  }
+  .panel-head .t { font-size: 12px; font-weight: 500; color: var(--accent); }
+  .panel-head .sp { flex: 1; }
+  .panel-body { padding: 8px 10px 10px; }
+  .panel-body > section:last-child { margin-bottom: 0; }
   section { margin-bottom: 12px; }
   section h2 { font-size: 12px; font-weight: 500; color: var(--accent); margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1px solid var(--border); }
   table { width: 100%; border-collapse: collapse; }
@@ -133,31 +144,48 @@
   tr:hover td { background: var(--line); }
   /* 看盘行情表：每个分组表用同一套固定列宽（table-layout:fixed），
      让「股票/指数/商品期货」各表的表头与数据竖着对齐；
-     # 居中；名称(2)/代码(3) 表头与内容一起左对齐；其余数字列右对齐 */
+     列：# | 名称 | 现价 | 涨跌幅 | 当日增仓 | 当日增仓占比 | 时间 | 删除
+     # 居中；名称(2) 表头与内容一起左对齐；其余数字列右对齐。
+     名称列可点击 → 弹浮窗看 最高价/最低价/总持仓/昨收 等明细 */
   .quote-table { table-layout: fixed; }
-  .quote-table thead th:nth-child(1) { width: 36px; }
-  .quote-table thead th:nth-child(2) { width: 19%; }
-  .quote-table thead th:nth-child(3) { width: 13%; }
-  .quote-table thead th:nth-child(4), .quote-table thead th:nth-child(5),
-  .quote-table thead th:nth-child(6) { width: 10%; }
-  .quote-table thead th:nth-child(7), .quote-table thead th:nth-child(8) { width: 11%; }
-  .quote-table thead th:nth-child(9) { width: 96px; }
-  .quote-table thead th:last-child { width: 7%; }
-  .quote-table th:nth-child(2), .quote-table td:nth-child(2),
-  .quote-table th:nth-child(3), .quote-table td:nth-child(3) { text-align: left; }
+  .quote-table thead th:nth-child(1) { width: 36px; }    /* # */
+  .quote-table thead th:nth-child(2) { width: 20%; }     /* 名称（点击弹明细） */
+  .quote-table thead th:nth-child(3) { width: 12%; }     /* 现价 */
+  .quote-table thead th:nth-child(4) { width: 12%; }     /* 涨跌幅 */
+  .quote-table thead th:nth-child(5) { width: 16%; }     /* 当日增仓 */
+  .quote-table thead th:nth-child(6) { width: 16%; }     /* 当日增仓占比 */
+  .quote-table thead th:nth-child(7) { width: 14%; }     /* 时间 */
+  .quote-table thead th:last-child { width: 36px; }      /* 删除按钮 */
+  .quote-table th:nth-child(2), .quote-table td:nth-child(2) { text-align: left; }
   .quote-table th, .quote-table td { overflow: hidden; text-overflow: ellipsis; }
-  .quote-table th:nth-child(9), .quote-table td:nth-child(9) {
-    width: 96px; overflow: visible; text-overflow: clip;
+  .quote-table th:last-child, .quote-table td:last-child {
+    width: 36px; overflow: visible; text-overflow: clip; padding-left: 0; padding-right: 4px;
   }
-  .quote-table th:last-child, .quote-table td:last-child { overflow: visible; }
   /* 序号列：固定 36px 足够显示两位序号且不截断 */
   .quote-table th:nth-child(1), .quote-table td:nth-child(1) { padding-left: 4px; padding-right: 4px; overflow: visible; }
   /* 名称列表头与内容一起右移一点，和序号列留出间隔 */
   .quote-table th:nth-child(2), .quote-table td:nth-child(2) { padding-left: 14px; }
+  /* 名称可点：鼠标变手型，悬浮高亮提示可点 */
+  .quote-table td.name { cursor: pointer; }
+  .quote-table td.name:hover { color: var(--accent); }
+  /* 名称点击浮窗：明细（最高价 / 最低价 / 总持仓 / 昨收…） */
+  .qpop {
+    position: fixed; z-index: 40; min-width: 176px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 9px 7px; box-shadow: 0 8px 26px rgba(0, 0, 0, .65);
+  }
+  .qpop .hd {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px; padding-bottom: 3px;
+    border-bottom: 1px solid var(--border); color: var(--accent); font-size: 11px;
+  }
+  .qpop .hd .cd { color: var(--muted); font-size: 10px; }
+  .qpop .row { display: flex; justify-content: space-between; gap: 18px; line-height: 1.7; }
+  .qpop .row .lb { color: var(--muted); }
+  .qpop .row .vl { color: var(--text); }
+  .qpop .row.sep { margin-top: 3px; padding-top: 3px; border-top: 1px solid var(--line); }
   /* 持仓表：名称列(2) 表头跟随内容左对齐 */
   .pos-table th:nth-child(2), .pos-table td:nth-child(2) { text-align: left; }
-  .name { color: var(--text); cursor: pointer; text-align: left; }
-  .name:hover { color: var(--accent); }
+  .name { color: var(--text); text-align: left; }
   td.num, th.num { text-align: center; }
   .code { color: var(--muted); font-size: 11px; }
   .up { color: var(--up); }
@@ -194,9 +222,10 @@
   .settle-table th { color: var(--muted); text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border); }
   .settle-table td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
   footer { color: var(--muted); font-size: 11px; margin-top: 8px; }
-  .pos-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 3px; border-bottom: 1px solid var(--border); margin-bottom: 5px; }
-  .pos-head h2 { border-bottom: none; margin: 0; padding: 0; }
-  .sort-btn { font-size: 11px; padding: 2px 8px; }
+  /* 持仓框标题栏里的操作按钮（结算记录 / 盈亏排序 / 新增） */
+  .panel-head .sort-btn { font-size: 11px; padding: 2px 8px; }
+  /* 持仓表列多（10 列），收紧左右内边距，保证在 672px 宽的框里不被裁 */
+  .pos-table th, .pos-table td { padding: 2px 6px; }
   .pos-table tfoot td { padding-top: 7px; border-top: 1px solid var(--border); border-bottom: none; font-size: 12px; font-weight: 500; }
   .pos-table tfoot .pos-total-label { text-align: right; color: var(--muted); }
   .lock-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
@@ -217,17 +246,13 @@
   .pos-form .row-btns .primary { color: var(--accent); border-color: var(--accent); }
   .pos-form .msg { color: var(--up); font-size: 11px; min-height: 14px; }
   .op.edit:hover { color: var(--accent); }
-  /* 走势图弹窗 */
+  /* 弹窗 */
   .mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
   .mask.show { display: flex; }
   .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: 760px; max-width: 95vw; }
   .modal-head { display: flex; align-items: center; margin-bottom: 8px; }
   .modal-head .t { font-size: 14px; font-weight: 500; color: var(--accent); }
-  .modal-head .sub { margin-left: 10px; color: var(--muted); font-size: 12px; }
   .modal-head .sp { flex: 1; }
-  .modal-head .tab-btn { border: 1px solid var(--border); background: none; color: var(--muted); font-size: 12px; border-radius: 4px; padding: 2px 10px; margin-left: 6px; cursor: pointer; }
-  .modal-head .tab-btn.active { color: var(--accent); border-color: var(--accent); }
-  .modal-head .tab-btn:hover { color: var(--accent); }
   .modal-head .close-btn { border: none; background: none; color: var(--muted); font-size: 18px; cursor: pointer; }
   .modal-head .close-btn:hover { color: var(--up); }
   canvas { width: 100%; height: auto; display: block; }
@@ -291,27 +316,29 @@
   </div>
 
   <div class="layout">
-    <main id="main" data-page-node-id="aUiBJf2nwQlSxPUCGvPfE6"></main>
-    <aside id="positions"></aside>
+    <section class="panel panel-left">
+      <div class="panel-head">
+        <span class="t">自选</span>
+        <span class="sp"></span>
+        <span class="hint" id="watchCount"></span>
+      </div>
+      <div class="panel-body" id="main" data-page-node-id="aUiBJf2nwQlSxPUCGvPfE6"></div>
+    </section>
+    <section class="panel panel-right">
+      <div class="panel-head">
+        <span class="t">持仓</span>
+        <span class="sp"></span>
+        <button class="sort-btn" id="historyBtn">结算记录</button>
+        <button class="sort-btn" id="sortBtn">盈亏 ↓</button>
+        <button class="sort-btn" id="addPosBtn">+ 新增</button>
+      </div>
+      <div class="panel-body" id="positions"></div>
+    </section>
   </div>
 
-  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：新浪财经 · 涨红跌绿 · 国内期货可点名称看分时图 · 带 <span class="pos-tag" style="margin:0 2px">持</span> 标记且左侧有色条的行 = 你已持仓（悬浮看方向、开仓价与手数）</footer>
+  <footer data-page-node-id="0rsjVQD8yBUYzVp4UxEoZ3">数据源：东方财富 · 涨红跌绿 · 点名称看明细（最高/最低/总持仓/昨收/昨结）· 带 <span class="pos-tag" style="margin:0 2px">持</span> 标记且左侧有色条的行 = 你已持仓</footer>
   </div>
 </div>
-
-  <div class="mask" id="chartMask" data-page-node-id="gdtwTDxecJWSA11ewqjAVy">
-    <div class="modal" data-page-node-id="XABrQxVtR3cViDelkZIndc">
-      <div class="modal-head" data-page-node-id="8DXNgitJW9IkrROt3qBOCR">
-        <span class="t" id="chartTitle" data-page-node-id="YcHVKJGiCNhLAQ8ZKU86UC">--</span>
-        <span class="sub" id="chartSub" data-page-node-id="gVOc61wBTCEiuk8Z9AWFEl"></span>
-        <span class="sp" data-page-node-id="GSOHTBGaKSOWq38ZuGtXn7"></span>
-        <button class="tab-btn active" data-mode="min" data-page-node-id="vtrU9NZ560DLM9TOATsIIA">分时</button>
-        <button class="tab-btn" data-mode="day" data-page-node-id="f4oNRz6WjYLEbnkG4GOO7V">日K</button>
-        <button class="close-btn" id="chartClose" title="关闭" data-page-node-id="usynslTFQGtE8DzZAzAKQy">×</button>
-      </div>
-      <canvas id="chartCanvas" width="720" height="420" data-page-node-id="tfCt5cBCL6wPh2tCBz2E31"></canvas>
-    </div>
-  </div>
 
   <div class="mask" id="posMask">
     <div class="modal narrow">
@@ -409,16 +436,15 @@
   const dot = document.getElementById('dot');
   const updateTime = document.getElementById('updateTime');
   const main = document.getElementById('main');
+  const watchCount = document.getElementById('watchCount'); // 自选框标题右侧的品种计数
+  const sortBtn = document.getElementById('sortBtn');       // 持仓框标题栏：盈亏排序
+  const historyBtn = document.getElementById('historyBtn'); // 持仓框标题栏：结算记录
+  const addPosBtn = document.getElementById('addPosBtn');   // 持仓框标题栏：新增持仓
   const intervalSel = document.getElementById('interval');
   const refreshBtn = document.getElementById('refreshBtn');
   const searchInput = document.getElementById('searchInput');
   const addBtn = document.getElementById('addBtn');
   const suggestBox = document.getElementById('suggestBox');
-  const chartMask = document.getElementById('chartMask');
-  const chartCanvas = document.getElementById('chartCanvas');
-  const chartTitle = document.getElementById('chartTitle');
-  const chartSub = document.getElementById('chartSub');
-  const chartClose = document.getElementById('chartClose');
   const posMask = document.getElementById('posMask');
   const posTitle = document.getElementById('posTitle');
   const posCode = document.getElementById('posCode');
@@ -469,9 +495,6 @@
     applyGray(!gray);
     try { localStorage.setItem(THEME_KEY, gray ? '1' : '0'); } catch (e) { /* ignore */ }
   });
-  function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
   applyGray(gray);
 
   let timer = null;
@@ -655,6 +678,30 @@
     if (n >= 1e4) return (n / 1e4).toFixed(2) + '万';
     return String(n);
   }
+  // 整数 \+ 正数带 + 号：持仓量 391074 -> '391074'、增仓 -23638 -> '-23638'、+12106 -> '+12106'
+  function fmtInt(v) {
+    const n = Number(v);
+    if (isNaN(n)) return '--';
+    return (n > 0 ? '+' : '') + n.toFixed(0);
+  }
+  // 纯整数（不带正号）：总持仓/昨持仓这类「存量」值，加 + 号会误导
+  function fmtQty(v) {
+    const n = Number(v);
+    if (isNaN(n)) return '--';
+    return n.toFixed(0);
+  }
+  // 百分数 \+ 正数带 + 号：-5.7 -> '-5.70%'
+  function fmtPct(v) {
+    const n = Number(v);
+    if (isNaN(n)) return '--';
+    return (n > 0 ? '+' : '') + n.toFixed(2) + '%';
+  }
+  // 涨红跌绿（A股惯例）：正=红、负=绿、零=灰
+  function signCls(n) {
+    const v = Number(n);
+    if (isNaN(v) || v === 0) return 'flat';
+    return v > 0 ? 'up' : 'down';
+  }
   function fmtTime(t) {
     if (!t) return '--';
     const s = String(t);
@@ -673,29 +720,95 @@
     const c = normalizeCode(code);
     return (configPositions || []).find((p) => p.code === c);
   }
-  // 持仓悬浮提示：持仓 2 手 @1030
-  function posTip(pos) {
+  // 持仓摘要：「多 2 手 @1030」；统一用 Number 转字符串，避免 1030.0 / 708.00 位数不齐
+  function posBrief(pos) {
     if (!pos) return '';
-    // 统一用 Number 转字符串，避免出现 1030.0 / 708.00 这类位数不齐的显示
-    const lots = Number(pos.lots);
-    const lotsTxt = Number.isInteger(lots) ? String(lots) : String(lots);
-    return '持仓 ' + dirLabel(dirOf(pos)) + ' ' + lotsTxt + ' 手 @' + Number(pos.buyPrice);
+    return dirLabel(dirOf(pos)) + ' ' + Number(pos.lots) + ' 手 @' + Number(pos.buyPrice);
   }
-  // 名称单元格的标记与提示（持仓标签 + 分时图提示）
+  // 持仓悬浮提示（title 用）：持仓 多 2 手 @1030
+  function posTip(pos) {
+    return pos ? '持仓 ' + posBrief(pos) : '';
+  }
+  // 名称单元格的标记与提示（持仓标签）；data-code 供点击浮窗回定位
   function nameCell(d, code, pos) {
     const tag = pos ? '<span class="pos-tag">持</span>' : '';
-    const tips = [];
-    if (pos) tips.push(posTip(pos));
-    if (d && code.startsWith('nf_')) tips.push('查看分时图');
-    const title = tips.length ? ' title="' + tips.join(' · ') + '"' : '';
-    return '<td class="name"' + title + '>' + (d ? d.name : '--') + tag + '</td>';
+    return '<td class="name" data-code="' + code + '">' + (d ? d.name : '--') + tag + '</td>';
+  }
+
+  // ===== 名称点击浮窗（明细：最高价 / 最低价 / 总持仓 / 昨收 …）=====
+  let popEl = null;    // 浮窗 DOM（挂在 body 上，不受 .panel overflow:hidden 裁剪）
+  let popCode = null;  // 当前浮窗对应的代码：刷新重建表格后按代码重新定位
+
+  function closePop() {
+    if (popEl) { popEl.remove(); popEl = null; }
+    popCode = null;
+  }
+  // 浮窗里的一行：左标签右数值
+  function popRow(label, value, cls, sep) {
+    return '<div class="row' + (sep ? ' sep' : '') + '"><span class="lb">' + label +
+      '</span><span class="vl ' + (cls || '') + '">' + value + '</span></div>';
+  }
+  // 把浮窗贴到锚点（名称单元格）下方；超出右/下边界就翻转
+  function placePop(anchor) {
+    if (!popEl || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    const w = popEl.offsetWidth, h = popEl.offsetHeight;
+    let left = r.left;
+    if (left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - w);
+    let top = r.bottom + 4;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+    popEl.style.left = Math.round(left) + 'px';
+    popEl.style.top = Math.round(top) + 'px';
+  }
+  function openPop(code, anchor) {
+    const d = lastDataMap[code];
+    closePop();
+    popCode = code;
+    const el = document.createElement('div');
+    el.className = 'qpop';
+    let body = '';
+    if (d) {
+      body += popRow('最高价', fmtNum(d.high));
+      body += popRow('最低价', fmtNum(d.low));
+      body += popRow('总持仓', fmtQty(d.open_interest) + ' 手');
+      body += popRow('昨收', fmtNum(d.preclose));
+      body += popRow('昨结', fmtNum(d.yestclose));   // 涨跌幅的基准价
+      const pos = posOf(code);
+      if (pos) body += popRow('持仓', posBrief(pos), '', true);
+    } else {
+      body = '<div class="row"><span class="lb">无数据</span></div>';
+    }
+    el.innerHTML = '<div class="hd">' + (d ? d.name : fmtCode(code)) +
+      '<span class="cd">' + fmtCode(code) + '</span></div>' + body;
+    document.body.appendChild(el);
+    popEl = el;
+    placePop(anchor);
+  }
+  // 行情刷新会重建整张表，浮窗按代码重新贴到新的名称单元格上（同时刷新数值）
+  function reopenPop() {
+    if (!popEl || !popCode) return;
+    const cell = main.querySelector('td.name[data-code="' + popCode + '"]');
+    if (cell) openPop(popCode, cell);
+    else closePop();
+  }
+  // 只挪位置不重建（窗口缩放/页面滚动时用）
+  function syncPopPos() {
+    if (!popEl || !popCode) return;
+    const cell = main.querySelector('td.name[data-code="' + popCode + '"]');
+    if (cell) placePop(cell);
+    else closePop();
   }
 
   // ===== 渲染行情 =====
   function render(dataMap) {
     lastDataMap = dataMap;
     main.innerHTML = '';
-    allGroups().forEach((g) => {
+    const groups = allGroups();
+    if (watchCount) {
+      const n = groupCodes().length;
+      watchCount.textContent = groups.length ? ('共 ' + n + ' 个品种') : '';
+    }
+    groups.forEach((g) => {
       const sec = document.createElement('section');
       const h = document.createElement('h2');
       h.textContent = g.name;
@@ -703,49 +816,50 @@
       const table = document.createElement('table');
       table.className = 'quote-table';
       table.innerHTML =
-        '<thead><tr><th class="num">#</th><th>名称</th><th>代码</th><th>现价</th><th>当日最高</th><th>当日最低</th><th>涨跌</th><th>涨跌幅</th>' +
-        '<th>时间</th><th></th></tr></thead><tbody></tbody>';
+        '<thead><tr><th class="num">#</th><th>名称</th><th>现价</th><th>涨跌幅</th>' +
+        '<th>当日增仓</th><th>当日增仓占比</th><th>时间</th><th></th></tr></thead><tbody></tbody>';
       const tbody = table.querySelector('tbody');
       g.codes.forEach((code, idx) => {
         const d = dataMap[code];
         const pos = posOf(code); // 该品种是否持有（在「我的」里）
         const tr = document.createElement('tr');
         if (pos) tr.className = 'has-pos';
+        const delBtn = '<button class="op del" title="删除">×</button>';
+        // 名称单元格缺失 dataMap 也要能点（浮窗显示「无数据」）
+        const bindName = () => {
+          const cell = tr.querySelector('td.name');
+          if (!cell) return;
+          cell.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (popCode === code) closePop(); else openPop(code, cell);
+          });
+        };
         if (!d) {
           tr.innerHTML = `<td class="flat num">${idx + 1}</td>` + nameCell(d, code, pos) +
-            `<td class="code">${fmtCode(code)}</td><td colspan="6" class="flat">无数据</td><td><button class="op del" title="删除">×</button></td>`;
-          tr.querySelector('.del').addEventListener('click', () => removeCode(code));
+            `<td colspan="5" class="flat">无数据</td><td>${delBtn}</td>`;
         } else {
           const price = Number(d.price), yest = Number(d.yestclose);
           const updown = yest && !isNaN(yest) ? price - yest : 0;
           const pct = yest && yest !== 0 ? (updown / yest) * 100 : 0;
           const cls = updown > 0 ? 'up' : updown < 0 ? 'down' : 'flat';
-          const sign = updown > 0 ? '+' : '';
-          const chartBtn = code.startsWith('nf_')
-            ? '<button class="op chart" title="分时图">▦</button>' : '';
-          const delBtn = '<button class="op del" title="删除">×</button>';
           tr.innerHTML =
             `<td class="flat num">${idx + 1}</td>` +
             nameCell(d, code, pos) +
-            `<td class="code">${fmtCode(code)}</td>` +
             `<td class="${cls}">${fmtNum(price)}</td>` +
-            `<td>${fmtNum(d.high)}</td>` +
-            `<td>${fmtNum(d.low)}</td>` +
-            `<td class="${cls}">${sign}${fmtNum(updown, 2)}</td>` +
-            `<td class="${cls}">${sign}${fmtNum(pct, 2)}%</td>` +
+            `<td class="${cls}">${fmtPct(pct)}</td>` +
+            `<td class="${signCls(d.oi_change)}">${fmtInt(d.oi_change)}</td>` +
+            `<td class="${signCls(d.oi_change_ratio)}">${fmtPct(d.oi_change_ratio)}</td>` +
             `<td class="flat">${fmtTime(d.time)}</td>` +
-            `<td>${chartBtn}${delBtn}</td>`;
-          tr.querySelector('.del').addEventListener('click', () => removeCode(code));
-          if (code.startsWith('nf_')) {
-            tr.querySelector('.name').addEventListener('click', () => showChart(code));
-            tr.querySelector('.chart').addEventListener('click', () => showChart(code));
-          }
+            `<td>${delBtn}</td>`;
         }
+        tr.querySelector('.del').addEventListener('click', () => removeCode(code));
+        bindName();
         tbody.appendChild(tr);
       });
       sec.appendChild(table);
       main.appendChild(sec);
     });
+    reopenPop();   // 表格重建后把浮窗贴回原名称单元格
   }
 
   // ===== 我的持仓 =====
@@ -815,12 +929,7 @@
       if (!isNaN(r.pnl)) { totals.pnl += r.pnl; totals.hasPnl = true; }
     });
 
-    let html = '<section><div class="pos-head"><h2>我的持仓</h2>' +
-      '<div style="display:flex;gap:6px;">' +
-      '<button class="sort-btn" id="historyBtn">结算记录</button>' +
-      '<button class="sort-btn" id="sortBtn">盈亏' + (sortDesc ? ' ↓' : ' ↑') + '</button>' +
-      '<button class="sort-btn" id="addPosBtn">+ 新增</button></div></div>';
-    html += '<table class="pos-table"><thead><tr><th class="num">#</th><th>名称</th><th>方向</th><th>现价</th><th>开仓价</th><th>价差</th><th>手数</th><th>开仓保证金</th><th>盈亏</th><th></th></tr></thead><tbody>';
+    let html = '<table class="pos-table"><thead><tr><th class="num">#</th><th>名称</th><th>方向</th><th>现价</th><th>开仓价</th><th>价差</th><th>手数</th><th>开仓保证金</th><th>盈亏</th><th></th></tr></thead><tbody>';
     if (!sorted.length) {
       html += '<tr><td colspan="10" class="flat">暂无持仓，点右上角「+ 新增」添加</td></tr>';
     } else {
@@ -853,14 +962,9 @@
       html += '<tr><td colspan="6" class="pos-total-label">合计</td>' +
         `<td>${lotsText} 手</td><td>${marginText}</td><td class="${pnlCls}">${pnlText}</td><td></td></tr>`;
     }
-    html += '</tfoot></table></section>';
+    html += '</tfoot></table>';
     box.innerHTML = html;
-    const btn = box.querySelector('#sortBtn');
-    if (btn) btn.addEventListener('click', () => { sortDesc = !sortDesc; renderPositions(lastDataMap); });
-    const histBtn = box.querySelector('#historyBtn');
-    if (histBtn) histBtn.addEventListener('click', openHistory);
-    const addBtn2 = box.querySelector('#addPosBtn');
-    if (addBtn2) addBtn2.addEventListener('click', () => openPosForm(null));
+    sortBtn.textContent = '盈亏' + (sortDesc ? ' ↓' : ' ↑');
     box.querySelectorAll('.edit').forEach((b) => b.addEventListener('click', () => {
       const id = Number(b.closest('tr').dataset.id);
       const p = configPositions.find((x) => x.id === id);
@@ -1167,186 +1271,6 @@
   posLots.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') posMult.focus(); });
   posMult.addEventListener('keydown', (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') savePos(); });
 
-  // ===== 走势图（分时 / 日K）=====
-  let chartCode = null;
-  let chartMode = 'min';
-  const tabBtns = document.querySelectorAll('.tab-btn');
-
-  function showChart(code) {
-    chartCode = code;
-    const d = lastDataMap[code];
-    chartTitle.textContent = d ? d.name : code;
-    chartMask.classList.add('show');
-    setMode('min');
-  }
-  function setMode(mode) {
-    chartMode = mode;
-    tabBtns.forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
-    if (mode === 'min') loadMinLine(chartCode);
-    else loadDailyKLine(chartCode);
-  }
-  async function loadMinLine(code) {
-    const symbol = code.replace(/^nf_/, '');
-    chartSub.textContent = '';
-    try {
-      const resp = await fetch('/api/futures/minline?symbol=' + encodeURIComponent(symbol));
-      const json = await resp.json();
-      const data = json.data;
-      if (!Array.isArray(data) || data.length === 0) { chartSub.textContent = '无分时数据'; return; }
-      const yestclose = data.length && data[0].length > 5 ? Number(data[0][5]) : 0;
-      drawMinLine(chartCanvas, data, yestclose);
-      chartSub.textContent = symbol + (yestclose ? ' · 昨结 ' + fmtNum(yestclose) : '');
-    } catch (e) {
-      chartSub.textContent = '加载失败';
-    }
-  }
-  async function loadDailyKLine(code) {
-    const symbol = code.replace(/^nf_/, '');
-    chartSub.textContent = '';
-    try {
-      const resp = await fetch('/api/futures/dailykline?symbol=' + encodeURIComponent(symbol));
-      const json = await resp.json();
-      const data = json.data;
-      if (!Array.isArray(data) || data.length === 0) { chartSub.textContent = '无日K数据'; return; }
-      drawDailyKLine(chartCanvas, data, symbol);
-    } catch (e) {
-      chartSub.textContent = '加载失败';
-    }
-  }
-  function drawMinLine(canvas, data, yestclose) {
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-    const n = data.length;
-    if (!n) return;
-    const padL = 56, padR = 16, padT = 18, padB = 22;
-    const volH = 76, gap = 22;
-    const priceH = H - padT - padB - volH - gap;
-    const plotW = W - padL - padR;
-
-    const prices = data.map((r) => Number(r[1]));
-    const avgs = data.map((r) => Number(r[2]));
-    const vols = data.map((r) => Number(r[3] || 0));
-    let minP = Math.min(...prices, yestclose || Infinity);
-    let maxP = Math.max(...prices, yestclose || -Infinity);
-    avgs.forEach((v) => { if (v > 0) { minP = Math.min(minP, v); maxP = Math.max(maxP, v); } });
-    const pad = (maxP - minP) * 0.08 || 1;
-    minP -= pad; maxP += pad;
-    const maxVol = Math.max(...vols, 1);
-
-    const x = (i) => padL + (n === 1 ? 0 : (i / (n - 1)) * plotW);
-    const yP = (v) => padT + ((maxP - v) / (maxP - minP)) * priceH;
-    const volTop = padT + priceH + gap;
-    const yV = (v) => volTop + volH - (v / maxVol) * volH;
-
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.font = '10px monospace';
-    const gridN = 4;
-    for (let i = 0; i <= gridN; i++) {
-      const v = minP + ((maxP - minP) / gridN) * i;
-      const y = yP(v);
-      ctx.strokeStyle = cssVar('--grid'); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-      ctx.fillStyle = cssVar('--muted');
-      ctx.fillText(v.toFixed(1), padL - 4, y);
-    }
-    if (yestclose) {
-      ctx.strokeStyle = cssVar('--muted'); ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(padL, yP(yestclose)); ctx.lineTo(W - padR, yP(yestclose)); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    for (let i = 0; i < n; i++) {
-      const prev = i > 0 ? prices[i - 1] : yestclose;
-      ctx.fillStyle = prices[i] >= prev ? 'rgba(255,92,92,0.55)' : 'rgba(46,194,126,0.55)';
-      const bw = Math.max(1, plotW / n - 0.5);
-      ctx.fillRect(x(i) - bw / 2, yV(vols[i]), bw, volTop + volH - yV(vols[i]));
-    }
-    const last = prices[n - 1];
-    const lineColor = last >= yestclose ? '#ff5c5c' : '#2ec27e';
-    drawLine(ctx, data.map((r, i) => [x(i), yP(Number(r[1]))]), lineColor, 1.5);
-    drawLine(ctx, data.map((r, i) => [x(i), Number(r[2]) > 0 ? yP(Number(r[2])) : null]).filter((p) => p[1] !== null), '#f0b90b', 1);
-
-    ctx.fillStyle = cssVar('--muted');
-    ctx.textAlign = 'center';
-    const times = data.map((r) => r[0]);
-    [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1].forEach((i) => {
-      if (times[i]) ctx.fillText(times[i], x(i), H - 8);
-    });
-    ctx.textAlign = 'left';
-    ctx.fillStyle = lineColor; ctx.fillText('价格', padL + 4, padT - 4);
-    ctx.fillStyle = '#f0b90b'; ctx.fillText('均价', padL + 48, padT - 4);
-  }
-  function drawLine(ctx, pts, color, w) {
-    if (!pts.length) return;
-    ctx.strokeStyle = color; ctx.lineWidth = w;
-    ctx.beginPath();
-    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
-    ctx.stroke();
-  }
-  function drawDailyKLine(canvas, data, symbol) {
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-    const N = 120;
-    const rows = data.slice(-N);
-    const n = rows.length;
-    if (!n) return;
-    const padL = 56, padR = 16, padT = 18, padB = 22;
-    const volH = 76, gap = 22;
-    const priceH = H - padT - padB - volH - gap;
-    const plotW = W - padL - padR;
-
-    const opens = rows.map((r) => +r.o), closes = rows.map((r) => +r.c);
-    const highs = rows.map((r) => +r.h), lows = rows.map((r) => +r.l);
-    const vols = rows.map((r) => +r.v);
-    const minP = Math.min(...lows), maxP = Math.max(...highs);
-    const pad = (maxP - minP) * 0.05 || 1;
-    const lo = minP - pad, hi = maxP + pad;
-    const maxVol = Math.max(...vols, 1);
-
-    const yP = (v) => padT + ((hi - v) / (hi - lo)) * priceH;
-    const volTop = padT + priceH + gap;
-    const yV = (v) => volTop + volH - (v / maxVol) * volH;
-
-    ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.font = '10px monospace';
-    const gridN = 4;
-    for (let i = 0; i <= gridN; i++) {
-      const v = lo + ((hi - lo) / gridN) * i;
-      const y = yP(v);
-      ctx.strokeStyle = cssVar('--grid'); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-      ctx.fillStyle = cssVar('--muted'); ctx.fillText(v.toFixed(1), padL - 4, y);
-    }
-
-    const cw = plotW / n;
-    const bw = Math.max(1, cw * 0.7);
-    for (let i = 0; i < n; i++) {
-      const cx = padL + i * cw + cw / 2;
-      const up = closes[i] >= opens[i];
-      const color = up ? '#ff5c5c' : '#2ec27e';
-      ctx.fillStyle = up ? 'rgba(255,92,92,0.5)' : 'rgba(46,194,126,0.5)';
-      ctx.fillRect(cx - bw / 2, yV(vols[i]), bw, volTop + volH - yV(vols[i]));
-      ctx.strokeStyle = color; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(cx, yP(highs[i])); ctx.lineTo(cx, yP(lows[i])); ctx.stroke();
-      const yo = yP(opens[i]), yc = yP(closes[i]);
-      ctx.fillStyle = color;
-      ctx.fillRect(cx - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yo - yc)));
-    }
-
-    ctx.fillStyle = cssVar('--muted'); ctx.textAlign = 'center';
-    const dates = rows.map((r) => r.d);
-    [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1].forEach((i) => {
-      const cx = padL + i * cw + cw / 2;
-      if (dates[i]) ctx.fillText(dates[i].slice(5), cx, H - 8);
-    });
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ff5c5c'; ctx.fillText('阳线', padL + 4, padT - 4);
-    ctx.fillStyle = '#2ec27e'; ctx.fillText('阴线', padL + 48, padT - 4);
-    chartSub.textContent = symbol + ' · 最近 ' + n + ' 根日K';
-  }
-  function closeChart() { chartMask.classList.remove('show'); }
-
   // ===== 历史价格位置：当前价在历年同月合约合并区间里的位置 =====
   function hpCss() {
     if (document.getElementById('hpStyle')) return;
@@ -1396,7 +1320,7 @@
       }
       const s = j.stats;
       const years = (j.per_year || []).map((y) => `<div><b>${hpEsc(y.symbol)}</b>　${y.days}天　${f(y.min)} ~ ${f(y.max)}</div>`).join('');
-      const skip = (j.skipped_years && j.skipped_years.length) ? '<div class="hp-years">未纳入（新浪无更早数据）：' + hpEsc(j.skipped_years.join('、')) + '</div>' : '';
+      const skip = (j.skipped_years && j.skipped_years.length) ? '<div class="hp-years">未纳入（东财无更早数据）：' + hpEsc(j.skipped_years.join('、')) + '</div>' : '';
       const span = (s.max - s.min) > 0 ? Math.max(0, Math.min(100, (j.price - s.min) / (s.max - s.min) * 100)) : 50;
       panel.innerHTML =
         '<span class="hp-close">×</span>' +
@@ -1413,10 +1337,6 @@
       panel.querySelector('.hp-close').addEventListener('click', close);
     }
   }
-  chartClose.addEventListener('click', closeChart);
-  chartMask.addEventListener('click', (e) => { if (e.target === chartMask) closeChart(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChart(); });
-  tabBtns.forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
 
   // ===== 搜索联想 =====
   let suggestTimer = null;
@@ -1502,6 +1422,17 @@
 
   refreshBtn.addEventListener('click', load);
   intervalSel.addEventListener('change', setupTimer);
+  // 名称浮窗：点空白处 / ESC 关闭；窗口缩放或页面滚动时跟随名称单元格重新定位
+  document.addEventListener('click', (ev) => {
+    if (popEl && !popEl.contains(ev.target)) closePop();
+  });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closePop(); });
+  window.addEventListener('resize', syncPopPos);
+  window.addEventListener('scroll', syncPopPos, { passive: true });
+  // 持仓框标题栏按钮（静态元素，只绑一次）
+  sortBtn.addEventListener('click', () => { sortDesc = !sortDesc; renderPositions(lastDataMap); });
+  historyBtn.addEventListener('click', openHistory);
+  addPosBtn.addEventListener('click', () => openPosForm(null));
   addBtn.addEventListener('click', () => {
     const kw = searchInput.value;
     searchInput.value = '';

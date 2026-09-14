@@ -49,14 +49,14 @@ def futures_page():
 # 认证接口：/register、/login、/me
 app.include_router(auth_router)
 
-# ① 实时行情接口（网页抓取新浪）：/api/futures、suggest、minline、dailykline
+# ① 实时行情接口（东方财富）：/api/futures、suggest、minline、dailykline
 app.include_router(quotes_router)
 
-# ② 历史行情接口（读数据库，缺失日K时通过新浪客户端按需回填）：
+# ② 历史行情接口（读数据库，缺失日K时通过东财客户端按需回填）：
 #    /api/futures/hist-position、/api/history/dailybars
 app.include_router(futures_history_router)
 
-# ③ 期货合约目录接口（数据由 refresh_tradable_futures.py 定时刷新）
+# ③ 期货合约目录接口（数据由 refresh_futures_base.py 定时刷新）
 app.include_router(futures_catalog_router)
 
 # 持仓 CRUD 接口：/api/positions

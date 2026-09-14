@@ -1,81 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""外部数据访问的底层 HTTP、JSONP 工具和期货常量。"""
-import json
+"""期货常量：交易所映射、合约乘数、代码正则、批量大小。
+
+行情抓取的 HTTP 底座已迁到 app/clients/eastmoney_client.py（东方财富），
+这里不再保留新浪专用的 http_get / JSONP 解析。
+"""
 import re
-import socket
-import urllib.request
-
-from fastapi import HTTPException
-
-UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-REFERER = 'http://finance.sina.com.cn/'
-TIMEOUT = 15     # 单次请求超时（秒）
-SLEEP = 0.3      # 批量抓取请求间隔，避免新浪封 IP
-
-# 强制直连：行情源全是国内站点，环境/系统代理（V2Ray/Clash 等）只会导致
-# ProxyError/RemoteDisconnected，永远不该走代理。
-_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-
-
-def http_get(url: str, enc: str = 'utf-8', timeout: int = TIMEOUT) -> str:
-    """带 Referer/UA 的 GET，返回按 enc 解码后的文本。失败抛 HTTPException。"""
-    req = urllib.request.Request(url, headers={
-        'Referer': REFERER,
-        'User-Agent': UA,
-        'Accept': '*/*',
-    })
-    try:
-        with _OPENER.open(req, timeout=timeout) as resp:
-            buf = resp.read()
-    except socket.timeout:
-        raise HTTPException(status_code=504, detail='请求超时')
-    except Exception as e:
-        raise HTTPException(status_code=502, detail='代理请求失败: ' + str(e))
-    return buf.decode(enc, errors='replace')
-
-
-# JSONP `var xxx=<payload>;` —— 服务端剥壳，转纯 JSON 数组/对象
-_JSONP_VAR_RE = re.compile(r'var\s+[A-Za-z_]\w*\s*=\s*(.*?)\s*;?\s*$', re.DOTALL)
-
-
-def parse_jsonp(text: str):
-    """从 `var t=(...);` 文本中提取 JSON。失败或为 null 返回 None。
-
-    新浪 JSONP 实际是 `var t=(<JSON>);` —— 外层圆括号是 JS 表达式分组，
-    不是合法 JSON。需要剥掉再喂给 json.loads。
-    """
-    s = (text or '').strip()
-    if not s:
-        return None
-    m = _JSONP_VAR_RE.search(s)
-    if not m:
-        return None
-    payload = m.group(1).strip()
-    if not payload or payload == 'null':
-        return None
-    # 剥外层 JS 表达式括号：`var t=([[...]]);` -> `[[...]]`
-    if payload.startswith('(') and payload.endswith(')'):
-        payload = payload[1:-1].strip()
-    try:
-        return json.loads(payload)
-    except json.JSONDecodeError:
-        return None
-
-
-# =====================================================================
-# 二、实时行情 / 联想 解析（新浪原始格式 -> 统一 JSON 结构）
-# =====================================================================
-
-# hq.sinajs.cn 单行：var hq_str_<code>="f1,f2,...,fN";
-
-EXCHANGE_MAP = {
-    'czce': 'CZCE',   # 郑州商品交易所
-    'dce': 'DCE',     # 大连商品交易所
-    'shfe': 'SHFE',   # 上海期货交易所（含上海国际能源 INE 品种）
-    'cffex': 'CFFEX', # 中国金融期货交易所（股指/国债）
-    'gfex': 'GFEX',   # 广州期货交易所
-}
 
 # 品种乘数字典：underlying -> (multiplier, tick_size)
 # 每点价值（合约乘数，元/点）。新品种（铂/钯）暂 None，前端可手动补。

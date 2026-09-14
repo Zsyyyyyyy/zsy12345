@@ -4,13 +4,13 @@
 fetch_daily_history.py —— 批量拉取期货历史日K行情，写入 futures_daily_bars
 
 对关注品种清单（DEFAULT_UNDERLYINGS，见下）逐月拼合约 symbol（如 RB2001），
-问新浪日K接口，解析 OHLCV，按 (symbol, trade_date) 幂等 upsert 到 futures_daily_bars。
+问东方财富日K接口，解析 OHLCV，按 (symbol, trade_date) 幂等 upsert 到 futures_daily_bars。
 解析/入库复用 app/services/futures_history_service.py，
 与 /api/futures/hist-position 的按需回填共用同一份逻辑（字段/口径一致）。
 
 用法（在项目根目录）：
     venv/bin/python scripts/fetch_daily_history.py                      # 内置清单，2020-01 至今
-    venv/bin/python scripts/fetch_daily_history.py --since 2019-01      # 拉到新浪保留最早（约 2019）
+    venv/bin/python scripts/fetch_daily_history.py --since 2019-01      # 拉到东财保留最早（约 2019）
     venv/bin/python scripts/fetch_daily_history.py --underlyings RB,CU  # 指定品种
     venv/bin/python scripts/fetch_daily_history.py --all                # futures_base 全部品种
     venv/bin/python scripts/fetch_daily_history.py --limit 3            # 试跑前 3 个品种
@@ -37,7 +37,7 @@ from sqlalchemy import select
 
 from app.core.database import Base, engine, SessionLocal
 from app.models import FuturesDailyBar
-from app.clients.sina_client import get_daily_kline
+from app.clients.eastmoney_history_client import get_daily_kline
 from app.services.futures_history_service import parse_kline_rows, upsert_daily_bars
 
 engine.echo = False  # 只在脚本进程内关闭 SQL 日志，避免逐合约刷屏（不影响 app）
@@ -45,7 +45,7 @@ engine.echo = False  # 只在脚本进程内关闭 SQL 日志，避免逐合约�
 # ---- 关注品种清单（默认拉取目标，按交易所分组，中文名仅作注释）----
 # 「空月」两种含义：① 品种尚未上市（上市前的月份，如 AO/BR/LU/LH/BZ/SH/PX/PK/PF/SI/LC/PS/PL）；
 #                 ② 单数月合约品种（M/Y/A/C/CS/CF/SR/OI/AP 等偶数月无合约）。
-# 只要合约真实挂牌过，新浪都能拉到日K（2020 年之后全覆盖）。
+# 只要合约真实挂牌过，东财都能拉到日K（2020 年之后全覆盖）。
 DEFAULT_UNDERLYINGS: list[str] = [
     # ---- SHFE 上期所（含 INE 能源）----
     'RB',   # 螺纹钢
@@ -165,7 +165,7 @@ def fetch_underlying(underlying: str, since: date, until: date,
 
 def main():
     parser = argparse.ArgumentParser(description='批量拉取期货历史日K，写入 futures_daily_bars')
-    parser.add_argument('--since', default='2020-01', help='起始年月 YYYY-MM，默认 2020-01（新浪最早约 2019）')
+    parser.add_argument('--since', default='2020-01', help='起始年月 YYYY-MM，默认 2020-01（东财最早约 2019）')
     parser.add_argument('--until', default='', help='截止年月 YYYY-MM，默认=当前月')
     parser.add_argument('--underlyings', default='',
                         help='逗号分隔品种（如 RB,CU）；缺省=内置关注清单')

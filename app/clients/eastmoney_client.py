@@ -19,10 +19,16 @@ vip.stock.finance.sina.com.cn / hq.sinajs.cn（这两个域对云服务器 IP �
   CFFEX 220 IF2609 <-> IF2609  大写 4 位
   主力连续   nf_SA0 -> 115.sam（品种小写 + m）、nf_IF0 -> 220.ifm
 
-返回结构（与前端约定保持不变）：
-  {code, source_symbol, name, open, high, low, price, yestclose, volume, time}
-其中 yestclose 是「昨结算」（涨跌额以昨结为基准，与交易所口径一致），
-由 最新价 - 涨跌额 反推，取不到时退回东财的昨收字段。
+返回结构（前端依赖这些字段名）：
+  {code, source_symbol, name, open, high, low, price, yestclose, preclose,
+   volume, open_interest, oi_change, prev_oi, oi_change_ratio, time}
+其中：
+  yestclose = 昨结算（涨跌额以昨结为基准，与交易所口径一致），由 最新价 - 涨跌额 反推；
+  preclose  = 昨收盘（东财 f18，与「昨结」口径不同，仅作展示）；
+  open_interest    = 总持仓（东财 f108，手）；
+  oi_change        = 当日增仓（东财 f163，与「今日持仓 - 昨日持仓」一致）；
+  prev_oi          = 昨日持仓（东财 f210）；
+  oi_change_ratio  = 当日增仓占比（oi_change / prev_oi × 100，单位 %）。
 """
 import logging
 import os
@@ -471,7 +477,8 @@ def _fmt_time(stamp) -> str:
 _ULIST_PATH = "/api/qt/ulist.np/get"
 _ULIST_URL = f"https://{_ULIST_HOSTS[0]}{_ULIST_PATH}"     # 兼容旧引用/诊断展示
 _UT = "fa5fd1943c7b386f172d6893dbfba10b"
-_QUOTE_FIELDS = "f1,f2,f3,f4,f5,f6,f12,f13,f14,f15,f16,f17,f18,f124"
+# f108 总持仓 / f163 当日增仓 / f210 昨日持仓 —— 已在 2026-09-14 与日K持仓量交叉验证一致
+_QUOTE_FIELDS = "f1,f2,f3,f4,f5,f6,f12,f13,f14,f15,f16,f17,f18,f108,f163,f210,f124"
 _QUOTE_CHUNK = 80                          # 单次请求最多带多少个 secid
 
 
@@ -535,6 +542,16 @@ def _row_from_quote(code: str, row: dict) -> dict:
     yestclose = round(price - change, 4) if price is not None and change is not None else None
     if yestclose is None:
         yestclose = to_float(row.get("f18"))
+    # 持仓三件套：东财 f108 总持仓 / f163 当日增仓 / f210 昨日持仓。
+    # 缺哪项就用另外两项兜底算出（三个量本就满足 今日 = 昨日 + 增仓）。
+    oi = to_float(row.get("f108"))
+    oi_change = to_float(row.get("f163"))
+    prev_oi = to_float(row.get("f210"))
+    if oi_change is None and oi is not None and prev_oi is not None:
+        oi_change = oi - prev_oi
+    if prev_oi is None and oi is not None and oi_change is not None:
+        prev_oi = oi - oi_change
+    ratio = round(oi_change / prev_oi * 100, 2) if oi_change is not None and prev_oi else None
     project_symbol = code[3:].strip().upper()
     display = display_name(str(row.get("f14") or ""), project_symbol)
     return {
@@ -546,7 +563,12 @@ def _row_from_quote(code: str, row: dict) -> dict:
         "low": num_str(row.get("f16")),
         "price": num_str(price),
         "yestclose": num_str(yestclose),
+        "preclose": num_str(row.get("f18")),
         "volume": num_str(row.get("f5")),
+        "open_interest": num_str(oi),
+        "oi_change": num_str(oi_change),
+        "prev_oi": num_str(prev_oi),
+        "oi_change_ratio": num_str(ratio),
         "time": _fmt_time(row.get("f124")),
     }
 

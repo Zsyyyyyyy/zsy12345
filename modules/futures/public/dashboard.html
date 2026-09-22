@@ -16,6 +16,7 @@
     --up: #ff5c5c;   /* A股惯例：涨红 */
     --down: #2ec27e; /* 跌绿 */
     --flat: #8b949e;
+    --warn: #d29922; /* 降级行情通道提示 */
     --line: #1f1f1f; /* 行分隔线 / hover 底色 */
     --grid: #262626; /* 走势图网格线 */
     --mono: "Maple Mono","Maple Mono CN","霞鹜文楷等宽","LXGW WenKai Mono",monospace;
@@ -132,6 +133,9 @@
   }
   .panel-head .t { font-size: 12px; font-weight: 500; color: var(--accent); }
   .panel-head .sp { flex: 1; }
+  /* 降级行情通道提示：只在没走主通道时出现，说明昨收/增仓为何是 -- */
+  .panel-head .degraded { font-size: 11px; color: var(--warn); border: 1px solid var(--warn); border-radius: 3px; padding: 0 5px; }
+  .panel-head .degraded[hidden] { display: none; }
   .panel-body { padding: 8px 10px 10px; }
   .panel-body > section:last-child { margin-bottom: 0; }
   section { margin-bottom: 12px; }
@@ -320,6 +324,7 @@
       <div class="panel-head">
         <span class="t">自选</span>
         <span class="sp"></span>
+        <span class="degraded" id="chanBadge" hidden></span>
         <span class="hint" id="watchCount"></span>
       </div>
       <div class="panel-body" id="main" data-page-node-id="aUiBJf2nwQlSxPUCGvPfE6"></div>
@@ -437,6 +442,10 @@
   const updateTime = document.getElementById('updateTime');
   const main = document.getElementById('main');
   const watchCount = document.getElementById('watchCount'); // 自选框标题右侧的品种计数
+  const chanBadge = document.getElementById('chanBadge');   // 降级行情通道提示
+  // 实时行情实际走的通道（由 /api/futures 的 channel 字段给出）：
+  // 'ulist' 主通道；'futsse' 降级通道（无 昨收/昨日持仓/当日增仓，这几列显示 --）
+  let quoteChannel = '';
   const sortBtn = document.getElementById('sortBtn');       // 持仓框标题栏：盈亏排序
   const historyBtn = document.getElementById('historyBtn'); // 持仓框标题栏：结算记录
   const addPosBtn = document.getElementById('addPosBtn');   // 持仓框标题栏：新增持仓
@@ -665,7 +674,13 @@
   }
 
   // ===== 格式化 =====
+  // 空值判定：'' / null / undefined / '-' 都算「没这个数据」。
+  // 不能只判 isNaN —— Number('') 是 0，会把「没有数据」显示成 0（降级通道下增仓就是这种情况）
+  function blank(v) {
+    return v === null || v === undefined || v === '' || v === '-';
+  }
   function fmtNum(v, d) {
+    if (blank(v)) return '--';
     const n = Number(v);
     if (isNaN(n)) return '--';
     if (d === undefined) d = Math.abs(n) >= 1000 ? 1 : 2;
@@ -673,31 +688,35 @@
   }
   function fmtVol(v) {
     const n = Number(v);
-    if (isNaN(n) || n === 0) return '--';
+    if (blank(v) || isNaN(n) || n === 0) return '--';
     if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
     if (n >= 1e4) return (n / 1e4).toFixed(2) + '万';
     return String(n);
   }
   // 整数 \+ 正数带 + 号：持仓量 391074 -> '391074'、增仓 -23638 -> '-23638'、+12106 -> '+12106'
   function fmtInt(v) {
+    if (blank(v)) return '--';
     const n = Number(v);
     if (isNaN(n)) return '--';
     return (n > 0 ? '+' : '') + n.toFixed(0);
   }
   // 纯整数（不带正号）：总持仓/昨持仓这类「存量」值，加 + 号会误导
   function fmtQty(v) {
+    if (blank(v)) return '--';
     const n = Number(v);
     if (isNaN(n)) return '--';
     return n.toFixed(0);
   }
   // 百分数 \+ 正数带 + 号：-5.7 -> '-5.70%'
   function fmtPct(v) {
+    if (blank(v)) return '--';
     const n = Number(v);
     if (isNaN(n)) return '--';
     return (n > 0 ? '+' : '') + n.toFixed(2) + '%';
   }
   // 涨红跌绿（A股惯例）：正=红、负=绿、零=灰
   function signCls(n) {
+    if (blank(n)) return 'flat';
     const v = Number(n);
     if (isNaN(v) || v === 0) return 'flat';
     return v > 0 ? 'up' : 'down';
@@ -807,6 +826,16 @@
     if (watchCount) {
       const n = groupCodes().length;
       watchCount.textContent = groups.length ? ('共 ' + n + ' 个品种') : '';
+    }
+    // 降级通道提示：主通道不通时会自己亮起来，省得看见 -- 以为是数据源缺数据
+    if (chanBadge) {
+      const degraded = !!quoteChannel && quoteChannel !== 'ulist';
+      chanBadge.hidden = !degraded;
+      chanBadge.textContent = degraded ? '行情降级' : '';
+      chanBadge.title = degraded
+        ? '主行情通道（东财 push2）在本机网络下不可达，已自动改用备用通道；'
+          + '现价/涨跌幅/持仓/时间正常，但「昨收、当日增仓、当日增仓占比」取不到，显示为 --'
+        : '';
     }
     groups.forEach((g) => {
       const sec = document.createElement('section');
@@ -1395,6 +1424,7 @@
       const [json, marginJson] = await Promise.all([resp.json(), marginResp.json()]);
       // 配置/定时刷新期间可能同时发起多次请求，旧响应不能覆盖新响应
       if (requestSeq !== loadSeq) return;
+      quoteChannel = json.channel || '';
       const list = json.items || [];
       const map = {};
       list.forEach((it) => {

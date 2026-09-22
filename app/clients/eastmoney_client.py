@@ -5,10 +5,18 @@ vip.stock.finance.sina.com.cn / hq.sinajs.cn（这两个域对云服务器 IP �
 返回 403 / 456「IP 存在异常访问」，是此前 /api/futures 502 的根因）。
 
 用到的接口（均为东财公开行情接口，无需鉴权）：
-  实时行情  push2.eastmoney.com/api/qt/ulist.np/get        一次可取多合约
+  实时行情A push2.eastmoney.com/api/qt/ulist.np/get        一次可取多合约（字段最全）
   合约目录  futsseapi.eastmoney.com/list/{市场码}            一次返回该市场全部挂牌合约
   品种表    futsse-static.eastmoney.com/redis?msgid={市场码}
   合约明细  futsse-static.eastmoney.com/redis?msgid={市场码}_{序号}
+
+实时行情有**两条通道**（互为备份，见 _fetch_quote_rows）：
+  A. ulist（push2 / push2delay 两主机）——字段最全，含 昨收、昨日持仓、当日增仓；
+  B. 合约列表（futsseapi，另一组域名/IP）——整市场一次返回，含 最新价/昨结/涨跌/
+     开高低/成交量/持仓量/更新时间，但**没有** 昨收、昨日持仓、当日增仓。
+云机房出口（实测阿里云杭州）会出现 A 通道两台主机**同时**被断连
+（RemoteDisconnected，TLS 握手成功但请求不返回任何字节）而 B 通道正常的情况，
+故 A 整条通道不可用时自动降级到 B，保证看板不至于整屏空白。
 
 代码换算（项目内部统一「品种 + 4 位交割年月」，如 SA2701 / RB2610 / IF2609）：
   CZCE 115  SA2701 <-> SA701   郑商所用 3 位月份（年份末位 + 2 位），大写
@@ -489,32 +497,204 @@ def _has_quote_rows(payload) -> bool:
     return bool(diff)
 
 
-def _fetch_quote_rows(secids: list[str]) -> dict[tuple[int, str], dict]:
-    """批量取实时行情，返回 {(市场码, 东财代码大写): 原始行}。"""
+def _rows_from_ulist_payload(payload) -> dict[tuple[int, str], dict]:
+    """ulist 响应 -> {(市场码, 东财代码大写): 原始行}。"""
     rows: dict[tuple[int, str], dict] = {}
-    for start in range(0, len(secids), _QUOTE_CHUNK):
-        chunk = secids[start:start + _QUOTE_CHUNK]
-        if not chunk:
+    data = (payload or {}).get("data") or {}
+    diff = data.get("diff") if isinstance(data, dict) else data
+    if isinstance(diff, dict):
+        diff = [diff]
+    for row in diff or []:
+        if not isinstance(row, dict):
             continue
-        payload = http_json_multi(_ULIST_PATH, {
-            "fltt": "2", "invt": "2", "np": "1",
-            "secids": ",".join(chunk),
-            "fields": _QUOTE_FIELDS,
-            "ut": _UT,
-        }, _ULIST_HOSTS, require=_has_quote_rows, tag="realtime")
-        data = (payload or {}).get("data") or {}
-        diff = data.get("diff") if isinstance(data, dict) else data
-        if isinstance(diff, dict):
-            diff = [diff]
-        for row in diff or []:
-            try:
-                market = int(row.get("f13"))
-            except (TypeError, ValueError):
-                continue
-            code = str(row.get("f12") or "").strip().upper()
-            if code:
-                rows[(market, code)] = row
+        try:
+            market = int(row.get("f13"))
+        except (TypeError, ValueError):
+            continue
+        code = str(row.get("f12") or "").strip().upper()
+        if code:
+            rows[(market, code)] = row
     return rows
+
+
+def _fetch_quote_rows_ulist(secids: list[str]) -> dict[tuple[int, str], dict]:
+    """通道 A：ulist 批量行情（单次请求，不做分块）。"""
+    if not secids:
+        return {}
+    payload = http_json_multi(_ULIST_PATH, {
+        "fltt": "2", "invt": "2", "np": "1",
+        "secids": ",".join(secids),
+        "fields": _QUOTE_FIELDS,
+        "ut": _UT,
+    }, _ULIST_HOSTS, require=_has_quote_rows, tag="realtime")
+    return _rows_from_ulist_payload(payload)
+
+
+# ---------------------------------------------------------------- 通道 B：合约列表
+# 合约列表接口一次返回整个市场的全部挂牌合约（含主力连续），字段与 ulist 不同名，
+# 故映射成 f 字段名后复用 _row_from_quote 的解析，前端零改动。
+# 实测字段：p 最新价 zjsj 昨结 zde 涨跌额 zdf 涨跌幅 o/h/l vol 成交量
+#           ccl 持仓量 utime 更新时间戳（秒）zt/dt 涨停/跌停 zdf5 5日涨跌幅
+# 注意：**没有** 昨收(f18) / 昨日持仓(f210) / 当日增仓(f163)，这三项在降级通道下留空
+# （前端显示 '--'），不塞假值以免被当成真数据。
+_FUTS_HOST = "futsseapi.eastmoney.com"
+_FUTSSE_RT_FIELDS = "dm,sc,name,p,o,h,l,zjsj,zde,zdf,vol,ccl,utime"
+# 整市场列表约 3~4 万字节 × 5~6 个市场，多个页面同时刷新时用短缓存摊薄
+_FUTSSE_CACHE_TTL = float(os.getenv("FUTURES_FUTSSE_CACHE_TTL", "2"))
+
+# 通道级冷却：整条通道（含其所有主机）都不可用时，一段时间内不再白试。
+# 与主机级冷却分工：主机级负责「换一台」，通道级负责「这一族都别试了，直接走备份通道」。
+# 若只靠主机级，push2 家族每次刷新都会「全部主机冷却 -> 清空冷却强探一轮」，
+# 白试两台 + 等连接超时，实测每次多花约 1.4s。
+_CHANNEL_COOLDOWN = int(os.getenv("FUTURES_CHANNEL_COOLDOWN", "120"))
+_channel_down_until: dict[str, float] = {}
+
+_LAST_CHANNEL = ""          # 最近一次实时行情实际命中的通道（ulist / futsse）
+_futsse_cache: dict[int, tuple[float, dict[str, dict]]] = {}   # 市场码 -> (写入时刻, {代码大写: 行})
+
+
+def channel_state() -> dict:
+    """各行情通道状态，供 /api/futures/diag 与页脚展示。"""
+    now = time.monotonic()
+    return {
+        name: {
+            "cooldown_left": round(max(0.0, _channel_down_until.get(name, 0.0) - now), 1),
+            "last_ok": _LAST_OK_HOST.get(name, ""),
+        }
+        for name in ("ulist", "futsse")
+    }
+
+
+def last_channel() -> str:
+    """最近一次实时行情命中的通道名（ulist / futsse / 空）。"""
+    return _LAST_CHANNEL
+
+
+def _channel_ready(name: str) -> bool:
+    return _channel_down_until.get(name, 0.0) <= time.monotonic()
+
+
+def _mark_channel_down(name: str) -> None:
+    _channel_down_until[name] = time.monotonic() + _CHANNEL_COOLDOWN
+
+
+def _mark_channel_ok(name: str) -> None:
+    _channel_down_until.pop(name, None)
+
+
+def _futsse_market_rows(market: int) -> dict[str, dict]:
+    """通道 B 的原始行：某市场全部挂牌合约（东财代码大写 -> 行），带短 TTL 缓存。"""
+    now = time.monotonic()
+    cached = _futsse_cache.get(market)
+    if cached and now - cached[0] < _FUTSSE_CACHE_TTL:
+        return cached[1]
+    payload = http_json(f"{_FUTS_API}/list/{market}", {
+        "orderBy": "dm", "sort": "asc", "pageSize": "20000", "pageIndex": "0",
+        "field": _FUTSSE_RT_FIELDS,
+    })
+    rows: dict[str, dict] = {}
+    for row in (payload or {}).get("list") or []:
+        if not isinstance(row, dict):
+            continue
+        code = str(row.get("dm") or "").strip().upper()
+        if code:
+            rows[code] = row
+    if rows:
+        _futsse_cache[market] = (now, rows)
+    return rows
+
+
+def _as_ulist_row(row: dict) -> dict:
+    """合约列表行 -> ulist 行（仅补 f 字段名）。
+
+    昨结由 _row_from_quote 用「最新价 - 涨跌额」反推，与该接口的 zjsj 一致。
+    """
+    return {
+        "f2": row.get("p"),                     # 最新价
+        "f3": row.get("zdf"),                   # 涨跌幅
+        "f4": row.get("zde"),                   # 涨跌额
+        "f5": row.get("vol"),                   # 成交量
+        "f12": str(row.get("dm") or "").upper(),
+        "f13": row.get("sc"),                   # 市场码
+        "f14": row.get("name"),
+        "f15": row.get("h"),
+        "f16": row.get("l"),
+        "f17": row.get("o"),
+        "f108": row.get("ccl"),                 # 持仓量
+        "f124": row.get("utime"),               # 更新时间戳（秒）
+    }
+
+
+def _fetch_quote_rows_futsse(secids: list[str]) -> dict[tuple[int, str], dict]:
+    """通道 B：按市场整市场拉取，挑出需要的合约（主力连续也能取到）。"""
+    need: dict[int, set[str]] = {}
+    for secid in secids:
+        market_text, _, em_code = secid.partition(".")
+        try:
+            market = int(market_text)
+        except (TypeError, ValueError):
+            continue
+        need.setdefault(market, set()).add(em_code.strip().upper())
+
+    out: dict[tuple[int, str], dict] = {}
+    for market, codes in need.items():
+        market_rows = _futsse_market_rows(market)
+        if not market_rows:
+            raise RuntimeError(f"合约列表市场 {market} 返回空")
+        for code in codes:
+            raw = market_rows.get(code)
+            if raw:
+                out[(market, code)] = _as_ulist_row(raw)
+    if out:
+        _LAST_OK_HOST["futsse"] = _FUTS_HOST
+    return out
+
+
+def _fetch_quote_rows(secids: list[str]) -> dict[tuple[int, str], dict]:
+    """批量取实时行情，返回 {(市场码, 东财代码大写): 原始行}。
+
+    通道 A（ulist）优先；整条通道不可用时降级通道 B（合约列表）。
+    两条通道都不可用才抛错，错误信息里带上各自的原因，方便一眼看出是哪一环挂了。
+    """
+    global _LAST_CHANNEL
+
+    if _channel_ready("ulist"):
+        try:
+            rows: dict[tuple[int, str], dict] = {}
+            for start in range(0, len(secids), _QUOTE_CHUNK):
+                rows.update(_fetch_quote_rows_ulist(secids[start:start + _QUOTE_CHUNK]))
+            if rows:
+                _mark_channel_ok("ulist")
+                _LAST_CHANNEL = "ulist"
+                return rows
+            raise RuntimeError("ulist 未返回任何行情行")
+        except UpstreamBlocked:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            _mark_channel_down("ulist")
+            logger.warning("东财 ulist 通道不可用（%s），%ds 内改用合约列表通道",
+                           _brief_exc(exc), _CHANNEL_COOLDOWN)
+            ulist_error = _brief_exc(exc)
+    else:
+        ulist_error = "ulist 通道冷却中"
+
+    if _channel_ready("futsse"):
+        try:
+            rows = _fetch_quote_rows_futsse(secids)
+            if rows:
+                _mark_channel_ok("futsse")
+                _LAST_CHANNEL = "futsse"
+                logger.info("实时行情走合约列表通道：%d 个合约（无昨收/增仓字段，前端显示 --）",
+                            len(rows))
+                return rows
+            raise RuntimeError("合约列表未匹配到任何需要的合约")
+        except UpstreamBlocked:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            _mark_channel_down("futsse")
+            raise RuntimeError(f"实时行情两条通道均不可用 —— ulist：{ulist_error}；"
+                               f"futsse：{_brief_exc(exc)}") from exc
+    raise RuntimeError(f"实时行情通道均不可用 —— ulist：{ulist_error}；futsse 通道冷却中")
 
 
 _MONTH_IN_NAME_RE = re.compile(r"^(.*?)(\d{3,4})$")
@@ -575,7 +755,7 @@ def _row_from_quote(code: str, row: dict) -> dict:
 
 # ---------------------------------------------------------------- 数据源：合约目录
 
-_FUTS_API = "https://futsseapi.eastmoney.com"
+_FUTS_API = f"https://{_FUTS_HOST}"
 _REDIS_URL = "https://futsse-static.eastmoney.com/redis"
 _CONTRACT_FIELDS = "dm,sc,name,p,o,h,l,zjsj,zde,zdf,vol,ccl,cje"
 
@@ -717,11 +897,18 @@ def diagnose(codes: list[str]) -> dict:
         "codes": codes,
         "hosts_used": dict(_LAST_OK_HOST),      # 各接口实际命中的主机（诊断回退是否生效）
         "hosts_state": host_state(),            # 各主机冷却剩余秒数 / 连续失败次数
+        "channels": channel_state(),            # 两条实时行情通道：命中主机与冷却剩余
+        "last_channel": _LAST_CHANNEL,          # 最近一次实时行情实际走的通道
     }
 
-    # 三个域名各自探一次连通性
+    def _probe_futsse():
+        _futsse_cache.clear()                   # 绕开短缓存，真探一次
+        return _fetch_quote_rows_futsse(["115.sam"])
+
+    # 各域名/通道各自探一次连通性（不受通道冷却影响，排障时看的是真实可达性）
     probes = (
-        ("quote_ulist", lambda: _fetch_quote_rows(["115.sam"])),
+        ("realtime_ulist", lambda: _fetch_quote_rows_ulist(["115.sam"])),
+        ("realtime_futsse", _probe_futsse),
         ("contract_list", lambda: fetch_market_contracts(MARKET_IDS["CZCE"])),
         ("variety_table", lambda: http_json(_REDIS_URL, {"msgid": str(MARKET_IDS["CZCE"])})),
     )
@@ -757,6 +944,14 @@ def diagnose(codes: list[str]) -> dict:
     report["per_code"] = per_code
 
     ok = any(i.get("quote", {}).get("ok") for i in per_code)
-    report["结论"] = ("东财行情链路正常" if ok else
-                     "所有合约都取不到：看 per_code 与三个域名的 ok/error 字段")
+    report["结论"] = (
+        f"东财行情链路正常（实时行情实际走：{_LAST_CHANNEL or 'ulist'}）" if ok else
+        "所有合约都取不到：看 per_code 与 realtime_ulist / realtime_futsse 的 error 字段"
+    )
+    # 探测本身会触发降级/冷却，所以这几个状态字段在探测结束后重新取一次，
+    # 否则看到的是「探测之前」的旧状态，容易误判。
+    report["hosts_used"] = dict(_LAST_OK_HOST)
+    report["hosts_state"] = host_state()
+    report["channels"] = channel_state()
+    report["last_channel"] = _LAST_CHANNEL
     return report

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clients.eastmoney_client import diagnose, get_quotes, num_str
+from app.clients.eastmoney_client import diagnose, get_quotes, last_channel, num_str
 from app.clients.eastmoney_history_client import (
     get_daily_kline,
     get_minute_line,
@@ -88,7 +88,10 @@ def futures_margins(codes: str = Query(""), db: Session = Depends(get_db)):
 def futures(codes: str = ""):
     if not codes:
         raise HTTPException(status_code=400, detail="缺少 codes 参数")
-    return JSONResponse({"items": get_quotes(codes.split(","))})
+    items = get_quotes(codes.split(","))
+    # channel：本次实时行情实际走的通道（ulist = 主通道；futsse = 降级通道，
+    # 该通道没有 昨收/昨日持仓/当日增仓，前端据此提示「降级」并把空值显示为 --）
+    return JSONResponse({"items": items, "channel": last_channel()})
 
 
 @router.get("/api/futures/diag")

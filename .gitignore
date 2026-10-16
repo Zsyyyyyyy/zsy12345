@@ -1,17 +1,12 @@
-# ===== Python =====
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-.eggs/
-build/
-dist/
-
-# ===== 虚拟环境 =====
+# ===== 虚拟环境（历史遗留，2026-10-16 后项目为纯静态，已无Python 依赖）=====
 venv/
 .venv/
 
-# ===== 环境变量与密钥（.env 含数据库密码、SECRET_KEY，严禁提交）=====
+# ===== Python（若日后重新引入后端仍适用）=====
+__pycache__/
+*.py[cod]
+
+# ===== 环境变量与密钥 =====
 .env
 *.env
 !.env.example
@@ -24,11 +19,5 @@ venv/
 .vscode/
 *.iml
 
-# ===== 运行日志（deploy.sh 生成） =====
-logs/
-
 # ===== 系统 =====
 .DS_Store
-
-# ===== 数据库导出（含用户邮箱/密码哈希等数据，严禁提交） =====
-

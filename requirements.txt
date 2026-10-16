@@ -1,9 +1,14 @@
-fastapi
-uvicorn[standard]
-sqlalchemy>=2.0
-pymysql
-cryptography
-bcrypt
-PyJWT
-email-validator
-python-dotenv
+# 本项目自 2026-10-16 起为纯静态站点，不再有任何 Python 依赖。
+#
+# 8 个工具全部是纯前端 HTML，不调用后端 API。
+# 部署只需把项目根目录交给任意静态服务器：
+#   nginx  root /path/to/zsy12345;
+#   本地预览：直接双击 index.html，或 python3 -m http.server 8642
+#
+# 历史依赖（FastAPI 登录 + 期货行情，已随功能下线移除）：
+#   fastapi / uvicorn[standard] / sqlalchemy>=2.0 / pymysql / cryptography
+#   bcrypt / PyJWT / email-validator / python-dotenv / akshare
+#
+# 若日后要恢复后端，从 git 历史取回：
+#   git show ff40f65:requirements.txt          # 期货下线前
+#   git show 0118db6:app/main.py                # 登录下线前的后端

@@ -12,7 +12,7 @@
  * 兼容各模块里红点的不同 class 命名：
  *   .term-dot.r   hash / timestamp / zhconvert / currency-converter / fortune / notes / tetris
  *   .dot.r        price-calc
- *   .tdot.red     futures 行情看板
+ *   .tdot.red     关闭 / 返回上一页
  */
 (function () {
     'use strict';

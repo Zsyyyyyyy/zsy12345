@@ -273,7 +273,7 @@
       setLoading('login_btn', true);
       try {
         await api('/login', { username, password });
-        // 登录成功回跳：优先回到 ?next= 指向的页面（如行情面板），否则回首页
+        // 登录成功回跳：优先回到 ?next= 指向的页面，否则回首页
         const next = new URLSearchParams(location.search).get('next');
         const target = (next && next.startsWith('/') && !next.startsWith('//')) ? next : '/';
         window.location.href = target;

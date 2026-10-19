@@ -18,7 +18,7 @@
         }
 
         .term {
-            max-width: 640px; margin: 0 auto;
+            max-width: 700px; margin: 0 auto;
             background: #0d0d0d; border: 1px solid #262626;
             border-radius: 10px; overflow: hidden;
         }
@@ -56,9 +56,9 @@
         .io-main { display: flex; align-items: center; gap: 10px; }
 
         .currency-icon {
-            width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+            width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
-            font-size: 16px; font-weight: 700;
+            font-size: 18px; font-weight: 700;
         }
         .icon-cny { background: rgba(239,68,68,0.15); color: #ef4444; }
         .icon-usd { background: rgba(59,130,246,0.15); color: #3b82f6; }
@@ -70,7 +70,7 @@
 
         #inputAmount {
             flex: 1; min-width: 0; background: transparent; border: none; outline: none;
-            color: #e6e6e6; font-size: 26px; font-weight: 700; padding: 4px 0;
+            color: #e6e6e6; font-size: 34px; font-weight: 700; padding: 4px 0;
         }
         #inputAmount::placeholder { color: #4a4a4a; }
         #inputAmount::-webkit-outer-spin-button,
@@ -80,7 +80,7 @@
         .cur-select {
             appearance: none; -webkit-appearance: none; flex-shrink: 0;
             background: rgba(255,255,255,0.06); border: 1px solid #333; border-radius: 8px;
-            padding: 6px 26px 6px 10px; color: #d4d4d4; font-size: 12px; font-weight: 600;
+            padding: 7px 28px 7px 11px; color: #d4d4d4; font-size: 14px; font-weight: 600;
             cursor: pointer; outline: none; font-family: inherit;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
             background-repeat: no-repeat; background-position: right 8px center;
@@ -88,60 +88,76 @@
         .cur-select:hover { border-color: #58a6ff; }
         .cur-select option { background: #1e293b; color: #e2e8f0; }
 
-        .io-hint { font-size: 10px; color: #555; margin-top: 6px; display: flex; justify-content: space-between; }
+        .io-hint { font-size: 11px; color: #666; margin-top: 8px; display: flex; justify-content: space-between; }
         .io-hint .swap { color: #58a6ff; cursor: pointer; }
         .io-hint .swap:hover { text-decoration: underline; }
 
         /* ===== 结果网格 ===== */
         .sec-h {
-            font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.6px;
-            margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+            font-size: 12px; color: #777; letter-spacing: 0.4px;
+            margin-bottom: 9px; display: flex; align-items: center; gap: 7px;
         }
+        .sec-h .sec-ico { font-size: 13px; color: #58a6ff; }
         .sec-h .live-dot { width: 6px; height: 6px; background: #3fb950; border-radius: 50%; animation: pulse 2s infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
-        .sec-h .spacer { margin-left: auto; text-transform: none; letter-spacing: 0; }
+        .sec-h .spacer { margin-left: auto; letter-spacing: 0; font-size: 11px; color: #555; }
 
-        .res-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+        .res-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-bottom: 15px; }
         .res-card {
-            background: #0a0a0a; border: 1px solid #262626; border-radius: 10px;
-            padding: 9px 11px; cursor: pointer; position: relative;
+            background: #0a0a0a; border: 1px solid #262626; border-radius: 11px;
+            padding: 11px 12px; cursor: pointer; position: relative;
+            display: flex; align-items: center; gap: 10px;
             transition: border-color .15s, background .15s;
         }
         .res-card:hover { border-color: #3d4d5d; background: #111; }
         .res-card:active { transform: scale(0.985); }
         .res-card.copied { border-color: #3fb950; background: rgba(16,185,129,0.08); }
-        .res-top { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
-        .res-code { font-size: 10px; color: #666; font-weight: 600; letter-spacing: 0.3px; }
-        .res-name { font-size: 10px; color: #4a4a4a; }
+
+        .card-icon {
+            width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px; font-weight: 700;
+        }
+        .card-body { flex: 1; min-width: 0; }
+        .res-top { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+        .res-code { font-size: 11px; color: #7a7a7a; font-weight: 700; letter-spacing: 0.3px; }
+        .res-name { font-size: 11px; color: #555; }
         .res-val {
-            font-size: 19px; font-weight: 700; color: #e6e6e6;
+            font-size: 23px; font-weight: 700; color: #e6e6e6; line-height: 1.15;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .res-val.empty { color: #3a3a3a; font-weight: 500; }
-        .res-unit { font-size: 9px; color: #4a4a4a; margin-top: 2px; }
+        .res-unit { font-size: 10px; color: #555; margin-top: 2px; }
         .res-card .copy-tip {
-            position: absolute; right: 9px; bottom: 8px; font-size: 9px; color: #3fb950;
+            position: absolute; right: 10px; top: 8px; font-size: 12px; color: #3fb950;
             opacity: 0; transition: opacity .2s;
         }
         .res-card.copied .copy-tip { opacity: 1; }
 
         /* ===== 汇率表 ===== */
-        .rates-section { background: #0a0a0a; border: 1px solid #262626; border-radius: 10px; padding: 10px 12px; }
+        .rates-section { background: #0a0a0a; border: 1px solid #262626; border-radius: 11px; padding: 11px 13px; }
         .rate-row {
-            display: flex; align-items: baseline; justify-content: space-between;
-            padding: 3px 0; font-size: 11px; border-bottom: 1px solid rgba(51,65,85,0.35);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 4px 0; font-size: 12px; border-bottom: 1px solid rgba(51,65,85,0.35);
         }
         .rate-row:last-child { border-bottom: none; }
-        .rate-pair { color: #666; }
-        .rate-pair b { color: #999; font-weight: 600; }
-        .rate-pair .arrow { color: #444; margin: 0 4px; }
-        .rate-val { color: #d4d4d4; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .rate-left { display: flex; align-items: center; gap: 8px; }
+        .rate-icon {
+            width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 700; letter-spacing: -0.3px;
+        }
+        .rate-pair { color: #777; }
+        .rate-pair b { color: #aaa; font-weight: 600; }
+        .rate-pair .arrow { color: #4a4a4a; margin: 0 4px; }
+        .rate-val { color: #d4d4d4; font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
 
-        .footer { text-align: center; font-size: 10px; color: #555; margin-top: 10px; opacity: 0.7; }
+        .footer { text-align: center; font-size: 11px; color: #555; margin-top: 11px; opacity: 0.75; }
 
         @media (max-width: 460px) {
             .res-grid { grid-template-columns: 1fr; }
-            .res-val { font-size: 17px; }
+            .res-val { font-size: 21px; }
+            #inputAmount { font-size: 30px; }
         }
     </style>
 </head>
@@ -161,12 +177,12 @@
 
             <div class="io-box">
                 <div class="io-main">
-                    <div class="currency-icon icon-cny" id="srcIcon">¥</div>
+                    <div class="currency-icon icon-twd" id="srcIcon">NT$</div>
                     <input type="number" id="inputAmount" placeholder="0.00" step="any" min="0" autocomplete="off">
                     <select class="cur-select" id="srcSelect">
-                        <option value="CNY" selected>CNY</option>
+                        <option value="TWD" selected>TWD</option>
+                        <option value="CNY">CNY</option>
                         <option value="USD">USD</option>
-                        <option value="TWD">TWD</option>
                         <option value="THB">THB</option>
                         <option value="VND">VND</option>
                         <option value="JPY">JPY</option>
@@ -180,12 +196,13 @@
             </div>
 
             <div class="sec-h">
-                <span class="live-dot"></span>换算结果
+                <span class="sec-ico">⇄</span>换算结果
+                <span class="live-dot"></span>
                 <span class="spacer" id="updateTime">--</span>
             </div>
             <div class="res-grid" id="resGrid"></div>
 
-            <div class="sec-h">基准汇率 · 1 USD</div>
+            <div class="sec-h"><span class="sec-ico">≡</span>基准汇率 · 1 USD</div>
             <div class="rates-section"><div id="rateTable"></div></div>
 
             <div class="footer">数据来源: open.er-api.com · 汇率仅供参考</div>
@@ -194,8 +211,10 @@
 
 <script>
 (function() {
-    // 顺序即展示顺序；源币种从这个顺序里剔除后显示其余
-    var ORDER = ['CNY','USD','TWD','THB','VND','JPY','RUB'];
+    // 全部币种（向 API 取汇率、兜底赋值都用它）
+    var ALL = ['CNY','USD','TWD','THB','VND','JPY','RUB'];
+    // 结果卡片展示顺序：人民币 / 美元排最前（最常用），源币种会被剔除
+    var OUT_ORDER = ['CNY','USD','THB','VND','JPY','RUB','TWD'];
     var rates = { USD: 1, CNY: null, TWD: null, THB: null, VND: null, JPY: null, RUB: null };
     // 0 位小数的币种（日元无辅币，台币/越南盾同理）
     var ZERO_DEC = ['JPY','TWD','VND'];
@@ -204,6 +223,8 @@
     var symbols = { CNY:'¥', USD:'$', TWD:'NT$', THB:'฿', VND:'₫', JPY:'¥', RUB:'₽' };
     var icons   = { CNY:'¥', USD:'$', TWD:'NT$', THB:'฿', VND:'₫', JPY:'¥', RUB:'₽' };
     var iconCls = { CNY:'icon-cny', USD:'icon-usd', TWD:'icon-twd', THB:'icon-thb', VND:'icon-vnd', JPY:'icon-jpy', RUB:'icon-rub' };
+    // 汇率表小方块里放得下的两字母缩写
+    var abbr    = { CNY:'CN', USD:'US', TWD:'TW', THB:'TH', VND:'VN', JPY:'JP', RUB:'RU' };
 
     var $ = function(id){ return document.getElementById(id); };
     var inputAmount = $('inputAmount'), srcSelect = $('srcSelect'), srcIcon = $('srcIcon');
@@ -231,14 +252,17 @@
         srcIcon.textContent = icons[src];
         srcIcon.className = 'currency-icon ' + iconCls[src];
         var html = '';
-        ORDER.forEach(function(c) {
+        OUT_ORDER.forEach(function(c) {
             if (c === src) return;
             html += '<div class="res-card" data-cur="' + c + '">'
-                  +   '<div class="res-top"><span class="res-code">' + c + '</span>'
-                  +   '<span class="res-name">' + names[c] + '</span></div>'
-                  +   '<div class="res-val empty" data-val>—</div>'
-                  +   '<div class="res-unit">1 ' + src + ' = <span data-unit>—</span> ' + c + '</div>'
-                  +   '<span class="copy-tip">已复制</span>'
+                  +   '<div class="card-icon ' + iconCls[c] + '">' + icons[c] + '</div>'
+                  +   '<div class="card-body">'
+                  +     '<div class="res-top"><span class="res-code">' + c + '</span>'
+                  +     '<span class="res-name">' + names[c] + '</span></div>'
+                  +     '<div class="res-val empty" data-val>—</div>'
+                  +     '<div class="res-unit">1 ' + src + ' = <span data-unit>—</span> ' + c + '</div>'
+                  +   '</div>'
+                  +   '<span class="copy-tip">✓ 已复制</span>'
                   + '</div>';
         });
         resGrid.innerHTML = html;
@@ -307,12 +331,17 @@
 
     function renderRateTable() {
         var html = '';
-        ORDER.forEach(function(c) {
+        ALL.forEach(function(c) {
             if (c === 'USD') return;
             var v = rates[c];
             var txt = (v == null) ? '--' : group(v, v < 10 ? 4 : 2);
-            html += '<div class="rate-row"><span class="rate-pair"><b>USD</b><span class="arrow">→</span>'
-                  + names[c] + ' ' + c + '</span><span class="rate-val">' + txt + '</span></div>';
+            html += '<div class="rate-row">'
+                  +   '<span class="rate-left">'
+                  +     '<span class="rate-icon ' + iconCls[c] + '">' + abbr[c] + '</span>'
+                  +     '<span class="rate-pair">' + names[c] + ' <b>' + c + '</b></span>'
+                  +   '</span>'
+                  +   '<span class="rate-val">' + txt + '</span>'
+                  + '</div>';
         });
         rateTable.innerHTML = html;
     }
@@ -324,8 +353,8 @@
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             var data = await resp.json();
             if (data.result !== 'success') throw new Error('API error');
-            ORDER.forEach(function(c) { if (c !== 'USD') rates[c] = data.rates[c]; });
-            var missing = ORDER.filter(function(c){ return !rates[c]; });
+            ALL.forEach(function(c) { if (c !== 'USD') rates[c] = data.rates[c]; });
+            var missing = ALL.filter(function(c){ return !rates[c]; });
             if (missing.length) throw new Error('Missing data');
             var now = new Date();
             updateTime.textContent = '更新于 ' + now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});

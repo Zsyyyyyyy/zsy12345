@@ -65,7 +65,6 @@
         .icon-thb { background: rgba(34,197,94,0.15); color: #22c55e; }
         .icon-twd { background: rgba(245,158,11,0.15); color: #f59e0b; }
         .icon-rub { background: rgba(168,85,247,0.15); color: #a855f7; }
-        .icon-vnd { background: rgba(20,184,166,0.15); color: #14b8a6; }
         .icon-jpy { background: rgba(239,68,68,0.15); color: #f87171; }
 
         #inputAmount {
@@ -113,6 +112,14 @@
         .res-card:active { transform: scale(0.985); }
         .res-card.copied { border-color: #3fb950; background: rgba(16,185,129,0.08); }
 
+        /* 币种数为奇数，首张跨两列做主结果，其余 2×2 —— 末行不留空位 */
+        .res-grid > .res-card:first-child { grid-column: span 2; }
+        .res-card:first-child { padding: 13px 14px; }
+        .res-card:first-child .card-icon { width: 40px; height: 40px; font-size: 17px; border-radius: 11px; }
+        .res-card:first-child .res-val { font-size: 27px; }
+        .res-card:first-child .res-code { font-size: 12px; }
+        .res-card:first-child .res-name { font-size: 12px; }
+
         .card-icon {
             width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
@@ -157,6 +164,10 @@
         @media (max-width: 460px) {
             .res-grid { grid-template-columns: 1fr; }
             .res-val { font-size: 21px; }
+            /* 单列下取消跨列，否则会撑出隐式列 */
+            .res-grid > .res-card:first-child { grid-column: span 1; }
+            .res-card:first-child .res-val { font-size: 24px; }
+            .res-card:first-child .card-icon { width: 36px; height: 36px; font-size: 16px; }
             #inputAmount { font-size: 30px; }
         }
     </style>
@@ -184,7 +195,6 @@
                         <option value="CNY">CNY</option>
                         <option value="USD">USD</option>
                         <option value="THB">THB</option>
-                        <option value="VND">VND</option>
                         <option value="JPY">JPY</option>
                         <option value="RUB">RUB</option>
                     </select>
@@ -202,7 +212,7 @@
             </div>
             <div class="res-grid" id="resGrid"></div>
 
-            <div class="sec-h"><span class="sec-ico">≡</span>基准汇率 · 1 USD</div>
+            <div class="sec-h"><span class="sec-ico">≡</span>基准汇率 · 100 人民币</div>
             <div class="rates-section"><div id="rateTable"></div></div>
 
             <div class="footer">数据来源: open.er-api.com · 汇率仅供参考</div>
@@ -212,19 +222,19 @@
 <script>
 (function() {
     // 全部币种（向 API 取汇率、兜底赋值都用它）
-    var ALL = ['CNY','USD','TWD','THB','VND','JPY','RUB'];
+    var ALL = ['CNY','USD','TWD','THB','JPY','RUB'];
     // 结果卡片展示顺序：人民币 / 美元排最前（最常用），源币种会被剔除
-    var OUT_ORDER = ['CNY','USD','THB','VND','JPY','RUB','TWD'];
-    var rates = { USD: 1, CNY: null, TWD: null, THB: null, VND: null, JPY: null, RUB: null };
-    // 0 位小数的币种（日元无辅币，台币/越南盾同理）
-    var ZERO_DEC = ['JPY','TWD','VND'];
+    var OUT_ORDER = ['CNY','USD','THB','JPY','RUB','TWD'];
+    var rates = { USD: 1, CNY: null, TWD: null, THB: null, JPY: null, RUB: null };
+    // 0 位小数的币种（日元、台币都没有辅币单位）
+    var ZERO_DEC = ['JPY','TWD'];
 
-    var names   = { CNY:'人民币', USD:'美元', TWD:'新台币', THB:'泰铢', VND:'越南盾', JPY:'日元', RUB:'卢布' };
-    var symbols = { CNY:'¥', USD:'$', TWD:'NT$', THB:'฿', VND:'₫', JPY:'¥', RUB:'₽' };
-    var icons   = { CNY:'¥', USD:'$', TWD:'NT$', THB:'฿', VND:'₫', JPY:'¥', RUB:'₽' };
-    var iconCls = { CNY:'icon-cny', USD:'icon-usd', TWD:'icon-twd', THB:'icon-thb', VND:'icon-vnd', JPY:'icon-jpy', RUB:'icon-rub' };
+    var names   = { CNY:'人民币', USD:'美元', TWD:'新台币', THB:'泰铢', JPY:'日元', RUB:'卢布' };
+    var symbols = { CNY:'¥', USD:'$', TWD:'NT$', THB:'฿', JPY:'¥', RUB:'₽' };
+    var icons   = { CNY:'¥', USD:'$', TWD:'NT$', THB:'฿', JPY:'¥', RUB:'₽' };
+    var iconCls = { CNY:'icon-cny', USD:'icon-usd', TWD:'icon-twd', THB:'icon-thb', JPY:'icon-jpy', RUB:'icon-rub' };
     // 汇率表小方块里放得下的两字母缩写
-    var abbr    = { CNY:'CN', USD:'US', TWD:'TW', THB:'TH', VND:'VN', JPY:'JP', RUB:'RU' };
+    var abbr    = { CNY:'CN', USD:'US', TWD:'TW', THB:'TH', JPY:'JP', RUB:'RU' };
 
     var $ = function(id){ return document.getElementById(id); };
     var inputAmount = $('inputAmount'), srcSelect = $('srcSelect'), srcIcon = $('srcIcon');
@@ -260,7 +270,7 @@
                   +     '<div class="res-top"><span class="res-code">' + c + '</span>'
                   +     '<span class="res-name">' + names[c] + '</span></div>'
                   +     '<div class="res-val empty" data-val>—</div>'
-                  +     '<div class="res-unit">1 ' + src + ' = <span data-unit>—</span> ' + c + '</div>'
+                  +     '<div class="res-unit"><span data-base>1 ' + src + '</span> = <span data-unit>—</span> ' + c + '</div>'
                   +   '</div>'
                   +   '<span class="copy-tip">✓ 已复制</span>'
                   + '</div>';
@@ -280,6 +290,7 @@
             var c = card.getAttribute('data-cur');
             var valEl = card.querySelector('[data-val]');
             var unitEl = card.querySelector('[data-unit]');
+            var baseEl = card.querySelector('[data-base]');
             if (!ok) {
                 valEl.textContent = '—';
                 valEl.classList.add('empty');
@@ -291,10 +302,13 @@
             var out = usd * rates[c];
             valEl.textContent = symbols[c] + ' ' + group(out, dec(c));
             valEl.classList.remove('empty');
-            // 单位汇率按量级定小数位：越南盾那种大数用 2 位就够，台币要 4 位
+            // 单位汇率：1 源换不到 1 目标时改用 100 源做基准，否则读起来是 0.03 这种
             var unitVal = rates[c] / rates[src];
-            var unitDec = unitVal >= 1000 ? 2 : (unitVal >= 1 ? 4 : 6);
-            unitEl.textContent = group(unitVal, unitDec);
+            var base = unitVal < 1 ? 100 : 1;
+            var shown = unitVal * base;
+            var unitDec = shown >= 100 ? 2 : (shown >= 1 ? 4 : 6);
+            baseEl.textContent = base + ' ' + src;
+            unitEl.textContent = group(shown, unitDec);
         });
 
         if (!ok && inputAmount.value) {
@@ -332,9 +346,13 @@
     function renderRateTable() {
         var html = '';
         ALL.forEach(function(c) {
-            if (c === 'USD') return;
-            var v = rates[c];
-            var txt = (v == null) ? '--' : group(v, v < 10 ? 4 : 2);
+            if (c === 'CNY') return;
+            var txt = '--';
+            if (rates.CNY && rates[c] != null) {
+                // 基准：100 人民币能换多少
+                var v = 100 * rates[c] / rates.CNY;
+                txt = group(v, v >= 1 ? 2 : 4);
+            }
             html += '<div class="rate-row">'
                   +   '<span class="rate-left">'
                   +     '<span class="rate-icon ' + iconCls[c] + '">' + abbr[c] + '</span>'
@@ -363,7 +381,7 @@
             return true;
         } catch(e) {
             loading.classList.remove('show');
-            rates.CNY=7.10; rates.TWD=32.5; rates.THB=34.5; rates.VND=25400.0; rates.JPY=151.0; rates.RUB=90.0;
+            rates.CNY=7.10; rates.TWD=32.5; rates.THB=34.5; rates.JPY=151.0; rates.RUB=90.0;
             updateTime.textContent = '离线估算';
             renderRateTable(); calculate();
             showError('⚠️ 实时汇率获取失败，当前使用估算值。');
